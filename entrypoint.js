@@ -45,7 +45,7 @@ var files = require('fs').readFileSync(path.join(__dirname, configInputFile), 'u
 var headers = files[lineIndex++]
 
 function analyseOrPatch(args) {
-    const { functionInfo, triggerEvent, logRetention, customKmsArn, secureFunction, secureLog } = args
+    const { functionInfo, logRetention, customKmsArn, secureFunction, secureLog } = args
     return new Promise((resolve, reject) => {
         functionInfo.KMSKeyArn = functionInfo.KMSKeyArn || customKmsArn
         if (functionInfo.KMSKeyArn) {
@@ -103,23 +103,23 @@ const secOpsFunctions = function (files, callback) {
     const currentLine = files[lineIndex++]
     if (currentLine) {
         const parts = currentLine.split(',')
-        if (parts.length >= 7) {
+        if (parts.length >= 6) {
             const functionArn = `arn:aws:lambda:${parts[0]}:${parts[1]}:function:${parts[2]}`
-            const triggerEvent = parts[3] || 'Lambda'
-            const logRetention = parts[4] || 90
-            const customKmsArn = parts[5] ? `arn:aws:kms:${parts[0]}:${parts[1]}:key/${parts[5]}` : undefined
-            const secureFunction = JSON.parse((parts[6] || 'false').toLowerCase())
-            const secureLog = JSON.parse((parts[7] || 'false').toLowerCase())
-            simplify.getFunctionConfiguration({
+            const logRetention = parts[3] || 90
+            const customKmsArn = parts[4] ? `arn:aws:kms:${parts[0]}:${parts[1]}:key/${parts[4]}` : undefined
+            const secureFunction = JSON.parse((parts[5] || 'false').toLowerCase())
+            const secureLog = JSON.parse((parts[6] || 'false').toLowerCase())
+            simplify.getFunctionMetaInfos({
                 adaptor: provider.getFunction(),
                 functionConfig: { FunctionName: functionArn }
-            }).then(function (functionInfo) {
+            }).then(function (functionMeta) {
+                const functionInfo = functionMeta.Configuration
                 if (!scanOutput[functionInfo.FunctionName]) {
                     scanOutput[functionInfo.FunctionName] = {}
                 }
                 scanOutput[functionInfo.FunctionName] = functionInfo
-                analyseOrPatch({ functionInfo, triggerEvent, logRetention, customKmsArn, secureFunction, secureLog }).then(res => {
-                    funcList.push({ ...res })
+                analyseOrPatch({ functionInfo, logRetention, customKmsArn, secureFunction, secureLog }).then(res => {
+                    funcList.push({ ...res, Layers: functionMeta.LayerInfos })
                     if (lineIndex >= files.length) {
                         callback && callback(funcList)
                     } else {
@@ -178,14 +178,14 @@ try {
                             FunctionName: func.functionInfo.FunctionName.truncateRight(20),
                             LastModified: new Date(func.functionInfo.LastModified).toISOString(),
                             State: func.functionInfo.State,
-                            CodeSize: func.functionInfo.CodeSize,
-                            Timeout: func.functionInfo.Timeout,
-                            CodeSha256: func.functionInfo.CodeSha256.truncateLeft(5),
-                            TriggerEvent: func.triggerEvent.truncateRight(12),
-                            LogRetention: func.logRetention,
-                            CustomKmsArn: (func.customKmsArn || '').truncateLeft(12),
-                            SecureFunction: func.secureFunction ? (func.functionInfo.KMSKeyArn ? 'OK' : 'YES - PATCH') : (func.functionInfo.KMSKeyArn ? 'NO - PATCH' : 'OK'),
-                            SecureLog: func.secureLog ? (func.functionInfo.KMSKeyArn ? 'OK' : 'YES - PATCH') : (func.functionInfo.KMSKeyArn ? 'NO - PATCH' : 'OK')
+                            CodeSize: `${func.functionInfo.CodeSize} bytes`,
+                            Timeout: `${func.functionInfo.Timeout} secs`,
+                            CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5)} (OK)`,
+                            Layers: `${func.Layers.length} (OK)`,
+                            LogRetention: `${func.logRetention} days`,
+                            EncryptionMode: (func.customKmsArn ? 'KMS': 'Default').truncateLeft(12),
+                            SecureFunction: func.secureFunction ? (func.functionInfo.KMSKeyArn ? 'YES (OK)' : 'YES (PATCH)') : (func.functionInfo.KMSKeyArn ? 'NO (PATCH)' : 'NO (OK)'),
+                            SecureLog: func.secureLog ? (func.functionInfo.KMSKeyArn ? 'YES (OK)' : 'YES (PATCH)') : (func.functionInfo.KMSKeyArn ? 'NO (PATCH)' : 'NO (OK)')
                         }
                     })
                     utilities.printTableWithJSON(outputTable)

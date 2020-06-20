@@ -1,0 +1,31 @@
+{
+  "name": "simplify-secops",
+  "version": "0.1.0",
+  "description": "Simplify Security & Operation Interface",
+  "main": "entrypoint.js",
+  "bin": {
+    "simplify-secops": "entrypoint.js"
+  },
+  "scripts": {
+    "test": "npm run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simplify-framework/security.git"
+  },
+  "keywords": [
+    "simplify-framework",
+    "security",
+    "secops",
+    "lambda"
+  ],
+  "author": "Duong Dinh Cuong",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/simplify-framework/security/issues"
+  },
+  "homepage": "https://github.com/simplify-framework/security#readme",
+  "dependencies": {
+    "simplify-sdk": "^0.1.18"
+  }
+}

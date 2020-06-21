@@ -1,4 +1,4 @@
-# simplify-secops - Security & Operation
+# Security & Operation
 
 ![NPM Downloads](https://img.shields.io/npm/dw/simplify-secops)
 ![Package Version](https://img.shields.io/github/package-json/v/simplify-framework/security?color=green)

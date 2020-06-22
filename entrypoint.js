@@ -288,7 +288,7 @@ try {
                     if (typeof argv.simple !== 'undefined') {
                         isSimpleView = true
                     }
-                    const snapshotList = getSnapshotFromFile(path.join(__dirname, argv.output, `${argv.baseline || '$LATEST'}.json`))
+                    const snapshotList = getSnapshotFromFile(path.resolve(argv.output, `${argv.baseline || '$LATEST'}.json`))
                     const outputTable = functionList.map(func => {
                         const snapshot = snapshotList ? snapshotList.find(f => f.FunctionName === func.functionInfo.FunctionName) : { Layers: [] }
                         var areLayersValid = snapshotList ? true : false

@@ -27,6 +27,6 @@
   "homepage": "https://github.com/simplify-framework/security#readme",
   "dependencies": {
     "mkdirp": "^1.0.4",
-    "simplify-sdk": "^0.1.20"
+    "simplify-sdk": "^0.1.21"
   }
 }

@@ -39,6 +39,9 @@ var argv = require('yargs')
     .describe('region', 'AWS Specific Region')
     .alias('r', 'region')
     .default('region', 'eu-west-1')
+	.string('simple')
+    .alias('s', 'simple')
+    .describe('simple', 'Simple metric view')
     .demandOption(['i'])
     .demandCommand(1)
     .argv;
@@ -49,7 +52,7 @@ var cmdOPS = (argv._[0] || 'status').toUpperCase()
 var lineIndex = 0
 var funcList = []
 
-var files = require('fs').readFileSync(path.join(__dirname, configInputFile), 'utf-8').split(/\r?\n/)
+var files = require('fs').readFileSync(path.resolve(configInputFile), 'utf-8').split(/\r?\n/)
 var headers = files[lineIndex++]
 
 function getSnapshotFromFile(snapshotPath) {
@@ -145,7 +148,7 @@ function analyseOrPatch(args) {
             }
         } else {
             if (cmdOPS === 'PATCH') {
-                functionInfo.KMSKeyArn = combinedKmsKeyArn
+                functionInfo.KMSKeyArn = combinedKmsKeyArn ? combinedKmsKeyArn : functionInfo.KMSKeyArn
                 /** record new SHA256 Code Here */
                 simplify.enableOrDisableLogEncryption({
                     adaptor: provider.getKMS(),
@@ -156,7 +159,8 @@ function analyseOrPatch(args) {
                 }).then(function (_) {
                     console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : Configured secure logs with ${logRetention} days! \x1b[32m (OK) \x1b[0m`)
                     if (secureFunction) {
-                        console.error(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : To enable secure function mode. You must provide a KMS Custom KeyId! \x1b[31m (ERROR) \x1b[0m`)
+                        console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : Configured with KMS Custom KeyId \x1b[32m (OK) \x1b[0m`)
+						args.customKmsArn = functionInfo.KMSKeyArn
                     }
                     resolve(args)
                 }).catch(function (err) {
@@ -164,7 +168,7 @@ function analyseOrPatch(args) {
                 })
             } else if (cmdOPS === 'CHECK') {
                 if (secureFunction) {
-                    console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? (functionInfo.KMSKeyArn ? `Has already configure with KMS Custom KeyId \x1b[32m[GOOD]\x1b[0m` : `Provide KMS Custom KeyId to setup secure function! \x1b[33m (WARN) \x1b[0m`) : ( customKmsArn ? `Has KMS Custom KeyId but not set! \x1b[33m (WARN) \x1b[0m`: `Missing KMS Custom KeyId \x1b[33m (WARN) \x1b[0m`)}`)
+                    console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? (functionInfo.KMSKeyArn ? `Has already configure with KMS Custom KeyId \x1b[32m[GOOD]\x1b[0m` : `Provide KMS Custom KeyId to setup secure function! \x1b[33m (WARN) \x1b[0m`) : ( customKmsArn ? `Has KMS Custom KeyId but not set! \x1b[33m (WARN) \x1b[0m`: `Has configured with KMS but Custom KeyId input is not provided. \x1b[33m (WARN) \x1b[0m`)}`)
                 } else {
                     console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? `Has already configure with Custom KMS KeyId \x1b[32m[GOOD]\x1b[0m` : `Not matching KMS Custom KeyIds \x1b[33m (WARN) \x1b[0m`}`)
                 }
@@ -175,6 +179,7 @@ function analyseOrPatch(args) {
         }
     })
 }
+
 const secOpsFunctions = function (files, callback) {
     const currentLine = files[lineIndex++]
     if (currentLine) {
@@ -183,7 +188,11 @@ const secOpsFunctions = function (files, callback) {
             const functionName = parts[2]
             const functionVersion = parts[3] || undefined
             const logRetention = parts[4] || 90
-            const customKmsArn = parts[5] ? `arn:aws:kms:${parts[0]}:${parts[1]}:key/${parts[5]}` : null
+			const accountId = parts[1]
+			if (accountId.indexOf('E')!==-1) {
+				console.error(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionName} Invalid AccountId number format \x1b[31m (ERROR) \x1b[0m`)
+			}
+            const customKmsArn = parts[5] ? `arn:aws:kms:${parts[0]}:${accountId}:key/${parts[5]}` : null
             const secureFunction = JSON.parse((parts[6] || 'false').toLowerCase())
             const secureLog = JSON.parse((parts[7] || 'false').toLowerCase())
             if (cmdOPS === 'METRIC') {
@@ -212,8 +221,8 @@ const secOpsFunctions = function (files, callback) {
                         } else {
                             secOpsFunctions(files, callback)
                         }
-                    }).catch(err => console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} ${err} \x1b[31m (ERROR) \x1b[0m`))
-                }).catch(err => console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} ${err} \x1b[31m (ERROR) \x1b[0m`))
+                    }).catch(err => console.error(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} ${err} \x1b[31m (ERROR) \x1b[0m`))
+                }).catch(err => console.error(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${err} \x1b[31m (ERROR) \x1b[0m`))
             }
         }
     } else {
@@ -250,7 +259,7 @@ try {
                             const totalValue = parseFloat(m.Values.reduce((count, x) => count + x, 0)).toFixed(labelValue === 'Duration' ? 2: 0)
                             const functionName = functionList[m.Id.split('_')[1]].functionInfo.FunctionName
                             if (!m.Values.length) {
-                                m.Values.push('-')
+                                m.Values.push('0')
                                 m.Timestamps.push(timeValue)
                             }
                             for (let i = 0; i < m.Values.length; i++) {
@@ -260,7 +269,7 @@ try {
                                     mData[periodTimeValue][`DateTime (${lastHours} hours ago)`] = periodTimeValue
                                 }
                                 let data = {}
-                                const textValue = parseFloat(m.Values[i]).toFixed(labelValue === 'Duration' ? 2: 0)
+                                const textValue = parseFloat(m.Values[i] || '0').toFixed(labelValue === 'Duration' ? 2: 0)
                                 data[labelValue] =  labelValue === 'Duration' ? `${textValue} avg` : `${textValue} / ${totalValue}`
                                 mData[periodTimeValue] = { 'Function': functionName, ...mData[periodTimeValue], ...data }
                             }
@@ -268,6 +277,10 @@ try {
                         utilities.printTableWithJSON(Object.keys(mData).map(k => mData[k]))
                     }).catch(err => console.error(`${err}`))
                 } else if (cmdOPS === 'STATUS') {
+					let isSimpleView = false
+					if (typeof argv.simple !== 'undefined') {
+						isSimpleView = true
+					}
                     const snapshotList = getSnapshotFromFile(path.join(__dirname, argv.output, `${argv.baseline || '$LATEST'}.json`))
                     const outputTable = functionList.map(func => {
                         const snapshot = snapshotList ? snapshotList.find(f => f.FunctionName === func.functionInfo.FunctionName) : { Layers: [] }
@@ -278,19 +291,22 @@ try {
                                 areLayersValid = false
                             }
                         })
-                        return {
-                            FunctionName: func.functionInfo.FunctionName.truncateRight(20),
-                            LastModified: new Date(func.functionInfo.LastModified).toISOString(),
-                            State: func.functionInfo.State,
-                            CodeSize: `${func.functionInfo.CodeSize} bytes`,
-                            Timeout: `${func.functionInfo.Timeout} secs`,
+						const basicView = {
+                            FunctionName: func.functionInfo.FunctionName.truncateLeft(20),
                             CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5)} (${func.functionInfo.CodeSha256 === snapshot.CodeSha256 ? 'OK' : 'NOK'})`,
                             Layers: `${func.Layers.length} (${areLayersValid ? 'OK' : 'NOK'})`,
                             LogRetention: `${func.LogGroup.retentionInDays || '-'} / ${func.logRetention} (${func.LogGroup.retentionInDays == func.logRetention ? 'OK': 'PATCH'})`,
-                            EncryptionKey: (func.customKmsArn ? `KMS ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`: `Default ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`).truncateLeft(13),
+                            EncryptionKey: (func.customKmsArn ? `KMS ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`: `${func.functionInfo.KMSKeyArn ? 'KMS': 'Default'} ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`).truncateLeft(13),
                             SecureFunction: func.secureFunction ? (func.functionInfo.KMSKeyArn ? 'YES (OK)' : 'YES (PATCH)') : (func.functionInfo.KMSKeyArn ? 'NO (PATCH)' : 'NO (OK)'),
                             SecureLog: func.secureLog ? (func.LogGroup.kmsKeyId ? 'YES (OK)' : 'YES (PATCH)') : (func.LogGroup.kmsKeyId ? 'NO (PATCH)' : 'NO (OK)')
                         }
+						const extendedView = {
+							LastModified: new Date(func.functionInfo.LastModified).toISOString(),
+							State: func.functionInfo.State,
+							CodeSize: `${func.functionInfo.CodeSize} bytes`,
+							Timeout: `${func.functionInfo.Timeout} secs`
+						}
+                        return isSimpleView ? basicView : { ...basicView, ...extendedView }
                     })
                     utilities.printTableWithJSON(outputTable)
                 } else if (cmdOPS === 'SNAPSHOT') {

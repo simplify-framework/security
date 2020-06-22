@@ -31,12 +31,12 @@ eu-west-1,123456789012,test-function-kms,,90,1,TRUE,FALSE
 
 ### Example of (security) metrics:
 
-------------------------------------------------------------------------------------------------------------
-|           Function |  CodeSHA256 |  Layers | LogRetention | EncryptionKey | SecureFunction |   SecureLog |
-|--------------------|-------------|---------|--------------|---------------|----------------|-------------|
-|  test-function-foo | 9AD72= (OK) | 1 (NOK) | 90 / 90 (OK) |      KMS (OK) |       YES (OK) |     NO (OK) |
-| foo-secret-manager | f4Bfa= (OK) | 1 (NOK) | 90 / 90 (OK) |  Default (OK) |    YES (PATCH) | YES (PATCH) |
-|   foo-user-manager | bcBa1= (OK) | 1 (NOK) | 90 / 90 (OK) |  Default (OK) |        NO (OK) |     NO (OK) |
+-----------------------------------------------------------------------------------------------------------
+|           Function |  CodeSHA256 | Layers | LogRetention | EncryptionKey | SecureFunction |   SecureLog |
+|--------------------|-------------|--------|--------------|---------------|----------------|-------------|
+|  test-function-foo | 9AD72= (OK) | 1 (OK) | 90 / 90 (OK) |      KMS (OK) |       YES (OK) |     NO (OK) |
+| foo-secret-manager | f4Bfa= (OK) | 1 (OK) | 90 / 90 (OK) |  Default (OK) |    YES (PATCH) | YES (PATCH) |
+|   foo-user-manager | bcBa1= (OK) | 1 (OK) | 90 / 90 (OK) |  Default (OK) |        NO (OK) |     NO (OK) |
 
 
 ### Example of (operation) metrics:

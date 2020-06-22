@@ -13,7 +13,7 @@ const CGOOD = '\x1b[32m'
 const opName = `SecOps`
 
 var argv = require('yargs')
-    .usage('simplify-secops status|patch|check|metric|snapshot [options]')
+    .usage('simplify-secops verify|patch|check|metric|snapshot [options]')
     .string('input')
     .alias('i', 'input')
     .describe('input', 'Input file contains function list')
@@ -48,7 +48,7 @@ var argv = require('yargs')
 
 var configInputFile = argv.input || 'functions.csv'
 var scanOutput = {}
-var cmdOPS = (argv._[0] || 'status').toUpperCase()
+var cmdOPS = (argv._[0] || 'verify').toUpperCase()
 var lineIndex = 0
 var funcList = []
 
@@ -56,7 +56,7 @@ var files = require('fs').readFileSync(path.resolve(configInputFile), 'utf-8').s
 var headers = files[lineIndex++]
 
 function getSnapshotFromFile(snapshotPath) {
-    console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} Snapshot from ${snapshotPath}`)
+    simplify.consoleWithMessage(opName, `${cmdOPS} Snapshot from ${snapshotPath}`)
     if (fs.existsSync(snapshotPath)) {    
         return JSON.parse(fs.readFileSync(snapshotPath).toString())
     } else {
@@ -85,7 +85,7 @@ function takeSnapshotToFile(functionList, outputPath) {
             LogGroup: { LogGroupName: f.LogGroup.logGroupName }
         }
     }), null, 2), 'utf8');
-    console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} to ${outputPath} \x1b[32m (OK) \x1b[0m`)
+    simplify.consoleWithMessage(opName, `${cmdOPS} to ${outputPath} \x1b[32m (OK) \x1b[0m`)
 }
 
 function analyseOrPatch(args) {
@@ -111,7 +111,7 @@ function analyseOrPatch(args) {
                             retentionInDays: logRetention,
                             enableOrDisable: secureLog
                         }).then(function (data) {
-                            console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : Configured secure logs with ${logRetention} days! \x1b[32m (OK) \x1b[0m`)
+                            simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : Configured secure logs with ${logRetention} days! \x1b[32m (OK) \x1b[0m`)
                             resolve(args)
                         }).catch(function (err) {
                             reject(`${err}`)
@@ -120,7 +120,7 @@ function analyseOrPatch(args) {
                         reject(`${err}`)
                     })
                 } else if (secureFunction /** enabled */ && !functionInfo.KMSKeyArn) {
-                    console.error(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : You must provide a KMS Custom KeyId! \x1b[31m (ERROR) \x1b[0m`)
+                    simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : You must provide a KMS Custom KeyId! \x1b[31m (ERROR) \x1b[0m`)
                     reject(`Missing KMS KeyId for ${functionInfo.FunctionName}`)
                 } else {
                     simplify.enableOrDisableLogEncryption({
@@ -130,7 +130,7 @@ function analyseOrPatch(args) {
                         retentionInDays: logRetention,
                         enableOrDisable: secureLog
                     }).then(function (_) {
-                        console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : Configured secure logs with ${logRetention} days! \x1b[32m (OK) \x1b[0m`)
+                        simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : Configured secure logs with ${logRetention} days! \x1b[32m (OK) \x1b[0m`)
                         resolve(args)
                     }).catch(function (err) {
                         reject(`${err}`)
@@ -138,9 +138,9 @@ function analyseOrPatch(args) {
                 }
             } else if (cmdOPS === 'CHECK') {
                 if (secureFunction) {
-                    console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? (functionInfo.KMSKeyArn ? `Has already configure with KMS Custom KeyId \x1b[32m[GOOD]\x1b[0m` : `Provide KMS Custom KeyId to setup secure function! \x1b[33m (WARN) \x1b[0m`) : ( customKmsArn ? `Has KMS Custom KeyId but not set! \x1b[33m (WARN) \x1b[0m`: `Missing KMS Custom KeyId \x1b[33m (WARN) \x1b[0m`)}`)
+                    simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? (functionInfo.KMSKeyArn ? `Has already configure with KMS Custom KeyId \x1b[32m[GOOD]\x1b[0m` : `Provide KMS Custom KeyId to setup secure function! \x1b[33m (WARN) \x1b[0m`) : ( customKmsArn ? `Has KMS Custom KeyId but not set! \x1b[33m (WARN) \x1b[0m`: `Missing KMS Custom KeyId \x1b[33m (WARN) \x1b[0m`)}`)
                 } else {
-                    console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? `Not require to use KMS Custom KeyId \x1b[32m[GOOD]\x1b[0m` : `Not matching KMS Custom KeyIds \x1b[33m (WARN) \x1b[0m`}`)
+                    simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? `Not require to use KMS Custom KeyId \x1b[32m[GOOD]\x1b[0m` : `Not matching KMS Custom KeyIds \x1b[33m (WARN) \x1b[0m`}`)
                 }
                 resolve(args)
             } else {
@@ -157,9 +157,9 @@ function analyseOrPatch(args) {
                     retentionInDays: logRetention,
                     enableOrDisable: secureLog
                 }).then(function (_) {
-                    console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : Configured secure logs with ${logRetention} days! \x1b[32m (OK) \x1b[0m`)
+                    simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : Configured secure logs with ${logRetention} days! \x1b[32m (OK) \x1b[0m`)
                     if (secureFunction) {
-                        console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : Configured with KMS Custom KeyId \x1b[32m (OK) \x1b[0m`)
+                        simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : Configured with KMS Custom KeyId \x1b[32m (OK) \x1b[0m`)
 						args.customKmsArn = functionInfo.KMSKeyArn
                     }
                     resolve(args)
@@ -168,9 +168,9 @@ function analyseOrPatch(args) {
                 })
             } else if (cmdOPS === 'CHECK') {
                 if (secureFunction) {
-                    console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? (functionInfo.KMSKeyArn ? `Has already configure with KMS Custom KeyId \x1b[32m[GOOD]\x1b[0m` : `Provide KMS Custom KeyId to setup secure function! \x1b[33m (WARN) \x1b[0m`) : ( customKmsArn ? `Has KMS Custom KeyId but not set! \x1b[33m (WARN) \x1b[0m`: `Has configured with KMS but Custom KeyId input is not provided. \x1b[33m (WARN) \x1b[0m`)}`)
+                    simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? (functionInfo.KMSKeyArn ? `Has already configure with KMS Custom KeyId \x1b[32m[GOOD]\x1b[0m` : `Provide KMS Custom KeyId to setup secure function! \x1b[33m (WARN) \x1b[0m`) : ( customKmsArn ? `Has KMS Custom KeyId but not set! \x1b[33m (WARN) \x1b[0m`: `Has configured with KMS but Custom KeyId input is not provided. \x1b[33m (WARN) \x1b[0m`)}`)
                 } else {
-                    console.log(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? `Has already configure with Custom KMS KeyId \x1b[32m[GOOD]\x1b[0m` : `Not matching KMS Custom KeyIds \x1b[33m (WARN) \x1b[0m`}`)
+                    simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${functionInfo.KMSKeyArn == customKmsArn ? `Has already configure with Custom KMS KeyId \x1b[32m[GOOD]\x1b[0m` : `Not matching KMS Custom KeyIds \x1b[33m (WARN) \x1b[0m`}`)
                 }
                 resolve(args)
             } else {
@@ -190,7 +190,7 @@ const secOpsFunctions = function (files, callback) {
             const logRetention = parts[4] || 90
 			const accountId = parts[1]
 			if (accountId.indexOf('E')!==-1) {
-				console.error(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionName} Invalid AccountId number format \x1b[31m (ERROR) \x1b[0m`)
+				simplify.consoleWithMessage(opName, `${cmdOPS} ${functionName} Invalid AccountId number format \x1b[31m (ERROR) \x1b[0m`)
 			}
             const customKmsArn = parts[5] ? `arn:aws:kms:${parts[0]}:${accountId}:key/${parts[5]}` : null
             const secureFunction = JSON.parse((parts[6] || 'false').toLowerCase())
@@ -221,8 +221,8 @@ const secOpsFunctions = function (files, callback) {
                         } else {
                             secOpsFunctions(files, callback)
                         }
-                    }).catch(err => console.error(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${functionInfo.FunctionName} ${err} \x1b[31m (ERROR) \x1b[0m`))
-                }).catch(err => console.error(`${CBEGIN}Simplify${CRESET} | ${cmdOPS} ${err} \x1b[31m (ERROR) \x1b[0m`))
+                    }).catch(err => simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} ${err} \x1b[31m (ERROR) \x1b[0m`))
+                }).catch(err => simplify.consoleWithMessage(opName, `${cmdOPS} ${err} \x1b[31m (ERROR) \x1b[0m`))
             }
         }
     } else {
@@ -275,8 +275,8 @@ try {
                             }
                         })
                         utilities.printTableWithJSON(Object.keys(mData).map(k => mData[k]))
-                    }).catch(err => console.error(`${err}`))
-                } else if (cmdOPS === 'STATUS') {
+                    }).catch(err => simplify.consoleWithMessage(`${err}`))
+                } else if (cmdOPS === 'VERIFY') {
 					let isSimpleView = false
 					if (typeof argv.simple !== 'undefined') {
 						isSimpleView = true

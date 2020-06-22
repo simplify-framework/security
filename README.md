@@ -16,18 +16,20 @@ eu-west-1,123456789012,test-function-kms,,90,1,TRUE,FALSE
 
 ### Command Line Support:
 - Verify deployed functions against your list of definitions
-    + `simplify-secops -p simplify-eu verify -i functions.csv`
+    + `simplify-secops -p simplify-eu verify -i functions.csv --simple`
 - Record a snapshot with current state of functions
     + `simplify-secops -p simplify-eu snapshot -i functions.csv -o .snapshot`
 - Verify deployed functions with a specified snapshot date
-    + `simplify-secops -p simplify-eu verify -i functions.csv -b 2020-06-21`
+    + `simplify-secops -p simplify-eu verify -i functions.csv -b 2020-06-21 --simple`
 - Check deployed functions and functions' parameters
     + `simplify-secops -p simplify-eu check -i functions.csv`
 - Patch deployed functions with functions' parameters
     + `simplify-secops -p simplify-eu patch -i functions.csv`
 - Monitor deployed functions with standard simple view metrics
     eg: options for last 12 hours with sample in every 300 seconds
-    + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12 --simple`
+    + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12`
+    eg: drawing the function data with index=0 as a timeseries chart
+    + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12 --plot 0`
 
 ### Example of (security) metrics:
 

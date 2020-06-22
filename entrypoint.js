@@ -6,10 +6,12 @@ const mkdirp = require('mkdirp')
 const simplify = require('simplify-sdk')
 const provider = require('simplify-sdk/provider')
 const utilities = require('simplify-sdk/utilities')
-const CBEGIN = '\x1b[32m'
-const CERROR = '\x1b[31m'
-const CRESET = '\x1b[0m'
-const CGOOD = '\x1b[32m'
+const asciichart = require('asciichart')
+const GREEN = '\x1b[32m'
+const RED = '\x1b[31m'
+const WHITE = '\x1b[0m'
+const BLUE = '\x1b[34m'
+const RESET = '\x1b[0m'
 const opName = `SecOps`
 
 var argv = require('yargs')
@@ -41,7 +43,9 @@ var argv = require('yargs')
     .default('region', 'eu-west-1')
     .string('simple')
     .alias('s', 'simple')
-    .describe('simple', 'Simple metric view')
+    .describe('simple', 'Simple verification view')
+    .string('plot')
+    .describe('plot', 'Drawing chart series')
     .demandOption(['i'])
     .demandCommand(1)
     .argv;
@@ -230,6 +234,79 @@ const secOpsFunctions = function (files, callback) {
     }
 }
 
+function printMetricCharts(metrics, functionList, index) {
+    const functionName = functionList[index].functionInfo.FunctionName
+    const lastHours = parseInt(argv.hours || 3)
+    const totalValues = {}
+    const series = metrics.MetricDataResults.map(m => {
+        if (!m.Values.length) {
+            m.Values.push(0)
+        }
+        const totalPeriodValue = parseFloat(m.Values.reduce((count, x) => count + x, 0))
+        const functionId = m.Id.split('_')[1]
+        const labelValue = `${m.Label}`
+        if (!totalValues[labelValue]) totalValues[labelValue] = 0
+        if (labelValue === 'Duration' || labelValue === 'Concurrency') {
+            totalValues[labelValue] = Math.max(totalValues[labelValue], ...m.Values)
+            totalValues[labelValue] = (labelValue === 'Duration' ? totalValues[labelValue].toFixed(2) : totalValues[labelValue])
+        } else {
+            totalValues[labelValue] += totalPeriodValue
+        }
+        if (functionId == index)
+            return m.Values
+        return undefined
+    }).filter(m => m)
+    console.log(`\n * (${functionName}): metric in the last ${lastHours} hours [ Invocations: ${BLUE}BLUE${RESET} - Errors: ${RED}RED${RESET} - Concurrency: ${GREEN}GREEN${RESET} - Throttles: ${WHITE}WHITE${RESET} ]\n`)
+    console.log(asciichart.plot(series.slice(0, 3), {
+        colors: [
+            asciichart.blue,
+            asciichart.red,
+            asciichart.green,
+            asciichart.default
+        ],
+        height: 20
+    }))
+    const totalLabels = {
+        "Invocations": "Total Invocation",
+        "Duration": "Max Duration",
+        "Concurrency": "Max Concurrency",
+        "Errors": "Total Errors",
+        "Throttles": "Total Throttle"
+    }
+    console.log(`\n * ${Object.keys(totalValues).map(kv => `${totalLabels[kv]}: ${totalValues[kv]}`).join(' | ')} \n`)
+}
+
+function printMetricTable(metrics, functionList) {
+    const mData = {}
+    const totalValues = {}
+    const lastHours = parseInt(argv.hours || 3)
+    const table = new utilities.PrintTable()
+    metrics.MetricDataResults.map(m => {
+        const data = {}
+        const labelValue = `${m.Label}`
+        if (!m.Values.length) {
+            m.Values.push(0)
+        }
+        const totalPeriodValue = parseFloat(m.Values.reduce((count, x) => count + x, 0))
+        if (!totalValues[labelValue]) totalValues[labelValue] = 0
+        if (labelValue === 'Duration' || labelValue === 'Concurrency') {
+            totalValues[labelValue] = Math.max(totalValues[labelValue], ...m.Values)
+            totalValues[labelValue] = (labelValue === 'Duration' ? totalValues[labelValue].toFixed(2) : totalValues[labelValue])
+        } else {
+            totalValues[labelValue] += totalPeriodValue
+        }
+        const functionId = m.Id.split('_')[1]
+        const functionName = functionList[functionId].functionInfo.FunctionName
+        data[labelValue] = (labelValue === 'Duration' || labelValue === 'Concurrency' ? Math.max(...m.Values) : totalPeriodValue)
+        data[labelValue] = (labelValue === 'Duration' ? data[labelValue].toFixed(2) : data[labelValue])
+        mData[functionId] = { 'Function': functionName.truncateLeft(50), ...mData[functionId], ...data }
+    })
+    let dataRows = Object.keys(mData).map(k => mData[k])
+    table.addRows(dataRows)
+    table.addRow({ 'Function': `Statistics in ${lastHours} hours`, ...totalValues }, { color: 'white_bold' })
+    table.printTable()
+}
+
 try {
     var config = simplify.getInputConfig({
         Region: argv.region || 'eu-west-1',
@@ -250,39 +327,12 @@ try {
                         startDate: startDate,
                         endDate: new Date()
                     }).then(metrics => {
-                        let thisDate = new Date()
-                        thisDate.setMinutes(0)
-                        let mData = {}
-                        let totalValues = {}
-                        const table = new utilities.PrintTable()
-                        for (let mi = 0; mi < metrics.MetricDataResults.length; mi++) {
-                            let data = {}
-                            const m = metrics.MetricDataResults[mi]
-                            let timeValue = thisDate.toISOString()
-                            const labelValue = `${m.Label}`
-                            const totalPeriodValue = parseFloat(m.Values.reduce((count, x) => count + x, 0))
-                            if (!totalValues[labelValue]) totalValues[labelValue] = 0
-                            if (labelValue === 'Duration' || labelValue === 'Concurrency') {
-                                totalValues[labelValue] = Math.max(totalValues[labelValue], ...m.Values)
-                                totalValues[labelValue] = (labelValue === 'Duration' ? totalValues[labelValue].toFixed(2) : totalValues[labelValue])
-                            } else {
-                                totalValues[labelValue] += totalPeriodValue
-                            }
-                            const functionId = m.Id.split('_')[1]
-                            const functionName = functionList[functionId].functionInfo.FunctionName
-                            if (!m.Values.length) {
-                                m.Values.push('0')
-                                m.Timestamps.push(timeValue)
-                            }
-                            data[labelValue] = (labelValue === 'Duration' || labelValue === 'Concurrency' ? Math.max(...m.Values) : totalPeriodValue)
-                            data[labelValue] = (labelValue === 'Duration' ? data[labelValue].toFixed(2) : data[labelValue])
-                            mData[functionId] = { 'Function': functionName.truncateLeft(50), ...mData[functionId], ...data }
+                        if (typeof argv.plot === 'undefined') {
+                            printMetricTable(metrics, functionList)
+                        } else {
+                            printMetricCharts(metrics, functionList, parseInt(argv.plot || 0))
                         }
-                        let dataRows = Object.keys(mData).map(k => mData[k])
-                        table.addRows(dataRows)
-                        table.addRow({ 'Function': `Statistics in ${lastHours} hours`, ...totalValues}, { color: 'white_bold' })
-                        table.printTable()
-                    }).catch(err => simplify.consoleWithMessage(`${err}`))
+                    }).catch(err => simplify.consoleWithMessage(opName, `${err}`))
                 } else if (cmdOPS === 'VERIFY') {
                     let isSimpleView = false
                     if (typeof argv.simple !== 'undefined') {

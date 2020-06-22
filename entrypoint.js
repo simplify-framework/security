@@ -276,7 +276,7 @@ try {
                             }
                             data[labelValue] = (labelValue === 'Duration' || labelValue === 'Concurrency' ? Math.max(...m.Values) : totalPeriodValue)
                             data[labelValue] = (labelValue === 'Duration' ? data[labelValue].toFixed(2) : data[labelValue])
-                            mData[functionId] = { 'Function': functionName, ...mData[functionId], ...data }
+                            mData[functionId] = { 'Function': functionName.truncateLeft(50), ...mData[functionId], ...data }
                         }
                         let dataRows = Object.keys(mData).map(k => mData[k])
                         table.addRows(dataRows)
@@ -299,8 +299,8 @@ try {
                             }
                         })
                         const basicView = {
-                            FunctionName: func.functionInfo.FunctionName.truncateLeft(20),
-                            CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5)} (${func.functionInfo.CodeSha256 === snapshot.CodeSha256 ? 'OK' : 'NOK'})`,
+                            FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
+                            CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5, '')} (${func.functionInfo.CodeSha256 === snapshot.CodeSha256 ? 'OK' : 'NOK'})`,
                             Layers: `${func.Layers.length} (${areLayersValid ? 'OK' : 'NOK'})`,
                             LogRetention: `${func.LogGroup.retentionInDays || '-'} / ${func.logRetention} (${func.LogGroup.retentionInDays == func.logRetention ? 'OK' : 'PATCH'})`,
                             EncryptionKey: (func.customKmsArn ? `KMS ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}` : `${func.functionInfo.KMSKeyArn ? 'KMS' : 'Default'} ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`).truncateLeft(13),

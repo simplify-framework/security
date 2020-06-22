@@ -41,11 +41,11 @@ eu-west-1,123456789012,test-function-kms,,90,1,TRUE,FALSE
 
 ### Example of (operation) metrics:
 
---------------------------------------------------------------------------
-|           Function | Invocations |  Errors |    Duration | Concurrency |
-|--------------------|-------------|---------|-------------|-------------|
-|  test-function-foo |         120 |       4 |      321.43 |          31 |
-| foo-secret-manager |           1 |       0 |     1161.00 |           1 |
-|   foo-user-manager |           1 |       0 |      938.53 |           1 |
-|   Stat in 12 hours |         **122** |       **4** |     **1161.00** |        **33** |
+--------------------------------------------------------------------------------
+|                 Function | Invocations |  Errors |    Duration | Concurrency |
+|--------------------------|-------------|---------|-------------|-------------|
+|        test-function-foo |         120 |       4 |      321.43 |          31 |
+|       foo-secret-manager |           1 |       0 |     1161.00 |           1 |
+|         foo-user-manager |           1 |       0 |      938.53 |           1 |
+|   Statistics in 12 hours |         **122** |       **4** |     **1161.00** |        **33** |
 

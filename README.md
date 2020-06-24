@@ -26,9 +26,9 @@ eu-west-1,123456789012,test-function-kms,,90,1,TRUE,FALSE
 - Patch deployed functions with functions' parameters
     + `simplify-secops -p simplify-eu patch -i functions.csv`
 - Monitor deployed functions with standard simple view metrics
-    eg: options for last 12 hours with sample in every 300 seconds
+  eg: options for last 12 hours with sample in every 300 seconds
     + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12`
-    eg: drawing the function data with index=0 as a timeseries chart
+  eg: drawing the function data with index=0 as a timeseries chart
     + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12 --plot 0`
 
 ### Example of (security) metrics:

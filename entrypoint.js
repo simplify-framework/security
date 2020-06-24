@@ -358,12 +358,15 @@ try {
                             SecureLog: func.secureLog ? (func.LogGroup.kmsKeyId ? 'YES (OK)' : 'YES (PATCH)') : (func.LogGroup.kmsKeyId ? 'NO (PATCH)' : 'NO (OK)')
                         }
                         const extendedView = {
+							FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
                             LastModified: new Date(func.functionInfo.LastModified).toISOString(),
                             State: func.functionInfo.State,
                             CodeSize: `${func.functionInfo.CodeSize} bytes`,
-                            Timeout: `${func.functionInfo.Timeout} secs`
+							MemorySize: `${func.functionInfo.MemorySize} MB`,
+                            Timeout: `${func.functionInfo.Timeout} secs`,
+							Runtime: func.functionInfo.Runtime
                         }
-                        return isSimpleView ? basicView : { ...basicView, ...extendedView }
+                        return isSimpleView ? basicView : extendedView
                     })
                     utilities.printTableWithJSON(outputTable)
                 } else if (cmdOPS === 'SNAPSHOT') {

@@ -20,7 +20,7 @@ eu-west-1,123456789012,test-function-kms,,90,1,TRUE,FALSE
 - Record a snapshot with current state of functions
     + `simplify-secops -p simplify-eu snapshot -i functions.csv -o .snapshot`
 - Verify deployed functions with a specified snapshot date
-    + `simplify-secops -p simplify-eu verify -i functions.csv -b 2020-06-21 --simple`
+    + `simplify-secops -p simplify-eu verify -i functions.csv -b 2020-06-21`
 - Check deployed functions and functions' parameters
     + `simplify-secops -p simplify-eu check -i functions.csv`
 - Patch deployed functions with functions' parameters

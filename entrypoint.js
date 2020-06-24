@@ -41,9 +41,9 @@ var argv = require('yargs')
     .describe('region', 'AWS Specific Region')
     .alias('r', 'region')
     .default('region', 'eu-west-1')
-    .string('simple')
-    .alias('s', 'simple')
-    .describe('simple', 'Simple verification view')
+    .string('extended')
+    .alias('e', 'extended')
+    .describe('extended', 'Extended verification view')
     .string('plot')
     .describe('plot', 'Drawing chart series')
     .demandOption(['i'])
@@ -225,8 +225,8 @@ const secOpsFunctions = function (files, callback) {
                         } else {
                             secOpsFunctions(files, callback)
                         }
-                    }).catch(err => simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} ${err} \x1b[31m (ERROR) \x1b[0m`))
-                }).catch(err => simplify.consoleWithMessage(opName, `${cmdOPS} ${err} \x1b[31m (ERROR) \x1b[0m`))
+                    }).catch(err => simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName}: ${err} \x1b[31m (ERROR) \x1b[0m`))
+                }).catch(err => simplify.consoleWithMessage(opName, `${cmdOPS}: ${err} \x1b[31m (ERROR) \x1b[0m`))
             }
         }
     } else {
@@ -334,15 +334,15 @@ try {
                         }
                     }).catch(err => simplify.consoleWithMessage(opName, `${err}`))
                 } else if (cmdOPS === 'VERIFY') {
-                    let isSimpleView = false
-                    if (typeof argv.simple !== 'undefined') {
-                        isSimpleView = true
+                    let isSimpleView = true
+                    if (typeof argv.extended !== 'undefined') {
+                        isSimpleView = false
                     }
                     const snapshotList = getSnapshotFromFile(path.resolve(argv.output, `${argv.baseline || '$LATEST'}.json`))
                     const outputTable = functionList.map(func => {
                         const snapshot = snapshotList ? snapshotList.find(f => f.FunctionName === func.functionInfo.FunctionName) : { Layers: [] }
                         var areLayersValid = snapshotList ? true : false
-                        snapshot.Layers.map(layer => {
+                        snapshot && snapshot.Layers.map(layer => {
                             const layerInfo = func.Layers.find(info => info.LayerVersionArn === layer.LayerVersionArn)
                             if (layerInfo.Content.CodeSha256 !== layer.CodeSha256) {
                                 areLayersValid = false
@@ -350,7 +350,7 @@ try {
                         })
                         const basicView = {
                             FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
-                            CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5, '')} (${func.functionInfo.CodeSha256 === snapshot.CodeSha256 ? 'OK' : 'NOK'})`,
+                            CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5, '')} (${func.functionInfo.CodeSha256 === (snapshot || {}).CodeSha256 ? 'OK' : 'NOK'})`,
                             Layers: `${func.Layers.length} (${areLayersValid ? 'OK' : 'NOK'})`,
                             LogRetention: `${func.LogGroup.retentionInDays || '-'} / ${func.logRetention} (${func.LogGroup.retentionInDays == func.logRetention ? 'OK' : 'PATCH'})`,
                             EncryptionKey: (func.customKmsArn ? `KMS ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}` : `${func.functionInfo.KMSKeyArn ? 'KMS' : 'Default'} ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`).truncateLeft(13),
@@ -367,8 +367,8 @@ try {
                     })
                     utilities.printTableWithJSON(outputTable)
                 } else if (cmdOPS === 'SNAPSHOT') {
-                    takeSnapshotToFile(functionList, path.join(__dirname, argv.output, `${utilities.getDateToday()}.json`))
-                    takeSnapshotToFile(functionList, path.join(__dirname, argv.output, `$LATEST.json`))
+                    takeSnapshotToFile(functionList, path.resolve(argv.output, `${utilities.getDateToday()}.json`))
+                    takeSnapshotToFile(functionList, path.resolve(argv.output, `$LATEST.json`))
                 }
             })
         }

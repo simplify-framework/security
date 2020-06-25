@@ -28,6 +28,6 @@
   "dependencies": {
     "asciichart": "^1.5.21",
     "mkdirp": "^1.0.4",
-    "simplify-sdk": "^0.1.22"
+    "simplify-sdk": "^0.1.23"
   }
 }

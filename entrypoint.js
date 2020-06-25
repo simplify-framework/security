@@ -363,7 +363,7 @@ try {
                             CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5, '')} (${func.functionInfo.CodeSha256 === (snapshot || {}).CodeSha256 ? 'OK' : 'NOK'})`,
                             Layers: `${func.Layers.length} (${areLayersValid ? 'OK' : 'NOK'})`,
                             LogRetention: `${func.LogGroup.retentionInDays || '-'} / ${func.logRetention || '-'} (${func.LogGroup.retentionInDays == func.logRetention ? 'OK' : 'PATCH'})`,
-                            EncryptionKey: (func.customKmsArn ? `KMS ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}` : `${func.functionInfo.KMSKeyArn ? 'KMS' : 'Default'} ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`).truncateLeft(13),
+                            EncryptionKey: (func.customKmsArn ? `KMS ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}` : `${func.functionInfo.KMSKeyArn ? 'KMS' : '-'} ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`).truncateLeft(13),
                             SecureFunction: func.secureFunction ? (func.functionInfo.KMSKeyArn ? 'YES (OK)' : 'YES (PATCH)') : (func.functionInfo.KMSKeyArn ? 'NO (PATCH)' : 'NO (OK)'),
                             SecureLog: func.secureLog ? (func.LogGroup.kmsKeyId ? 'YES (OK)' : 'YES (PATCH)') : (func.LogGroup.kmsKeyId ? 'NO (PATCH)' : 'NO (OK)')
                         }

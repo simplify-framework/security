@@ -116,7 +116,7 @@ function analyseOrPatch(args) {
                             retentionInDays: logRetention,
                             enableOrDisable: secureLog
                         }).then(function (data) {
-                            simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${(logRetention ? `Configured${secureLog ? ' KMS ': ' '}LogGroup retention for ${logRetention} days!` : `LogGroup is not required to configure` )} \x1b[32m (OK) \x1b[0m`)
+                            simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${(logRetention ? `Configured${secureLog ? ' KMS ' : ' '}LogGroup retention for ${logRetention} days!` : `LogGroup is not required to configure`)} \x1b[32m (OK) \x1b[0m`)
                             resolve(args)
                         }).catch(function (err) {
                             reject(`${err}`)
@@ -135,7 +135,7 @@ function analyseOrPatch(args) {
                         retentionInDays: logRetention,
                         enableOrDisable: secureLog
                     }).then(function (_) {
-                        simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${(logRetention ? `Configured${secureLog ? ' KMS ': ' '}LogGroup retention for ${logRetention} days!` : `LogGroup is not required to configure` )} \x1b[32m (OK) \x1b[0m`)
+                        simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${(logRetention ? `Configured${secureLog ? ' KMS ' : ' '}LogGroup retention for ${logRetention} days!` : `LogGroup is not required to configure`)} \x1b[32m (OK) \x1b[0m`)
                         resolve(args)
                     }).catch(function (err) {
                         reject(`${err}`)
@@ -162,7 +162,7 @@ function analyseOrPatch(args) {
                     retentionInDays: logRetention,
                     enableOrDisable: secureLog
                 }).then(function (_) {
-                    simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${(logRetention ? `Configured${secureLog ? ' KMS ': ' '}LogGroup retention for ${logRetention} days!` : `LogGroup is not required to configure` )} \x1b[32m (OK) \x1b[0m`)
+                    simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : ${(logRetention ? `Configured${secureLog ? ' KMS ' : ' '}LogGroup retention for ${logRetention} days!` : `LogGroup is not required to configure`)} \x1b[32m (OK) \x1b[0m`)
                     if (secureFunction) {
                         simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName} : Configured with KMS Custom KeyId \x1b[32m (OK) \x1b[0m`)
                         args.customKmsArn = functionInfo.KMSKeyArn
@@ -236,37 +236,39 @@ const secOpsFunctions = function (files, callback) {
 }
 
 function printMetricCharts(metrics, functionList, pIndex, mIndex) {
+    pIndex = pIndex < functionList.length ? pIndex : 0
     const functionName = functionList[pIndex].functionInfo.FunctionName
     const lastHours = parseInt(argv.hours || 3)
+    const periodMins = parseInt(argv.periods || 300)/60
     const totalValues = {}
     const series = metrics.MetricDataResults.map(m => {
-		const functionId = m.Id.split('_')[1]
-		const labelValue = `${m.Label}`
+        const functionId = m.Id.split('_')[1]
+        const labelValue = `${m.Label}`
         if (functionId == pIndex) {
-			if (!m.Values.length) {
-				m.Values.push(0)
-			}
-			const totalPeriodValue = parseFloat(m.Values.reduce((count, x) => count + x, 0))
-			if (!totalValues[labelValue]) totalValues[labelValue] = 0
-			if (labelValue === 'Duration' || labelValue === 'Concurrency') {
-				totalValues[labelValue] = Math.max(totalValues[labelValue], ...m.Values)
-				totalValues[labelValue] = (labelValue === 'Duration' ? (totalValues[labelValue]).toFixed(2) : totalValues[labelValue])
-			} else {
-				totalValues[labelValue] += totalPeriodValue
-			}
+            if (!m.Values.length) {
+                m.Values.push(0)
+            }
+            const totalPeriodValue = parseFloat(m.Values.reduce((count, x) => count + x, 0))
+            if (!totalValues[labelValue]) totalValues[labelValue] = 0
+            if (labelValue === 'Duration' || labelValue === 'Concurrency') {
+                totalValues[labelValue] = Math.max(totalValues[labelValue], ...m.Values)
+                totalValues[labelValue] = (labelValue === 'Duration' ? (totalValues[labelValue]).toFixed(2) : totalValues[labelValue])
+            } else {
+                totalValues[labelValue] += totalPeriodValue
+            }
             return m.Values
-		}
+        }
         return undefined
     }).filter(m => m)
-    console.log(`\n * (${functionName}): metric in the last ${lastHours} hours \n`)
-	const pColors = [
-		asciichart.blue,
-		asciichart.red,
-		asciichart.green,
-		asciichart.yellow,
-		asciichart.default
-	]
-    console.log(asciichart.plot(series.splice(mIndex || 0,1), {
+    console.log(`\n * (${functionName}): In the last ${lastHours} hours at every ${periodMins} minutes \n`)
+    const pColors = [
+        asciichart.blue,
+        asciichart.red,
+        asciichart.green,
+        asciichart.yellow,
+        asciichart.default
+    ]
+    console.log(asciichart.plot(series.splice(mIndex || 0, 1), {
         colors: [pColors[mIndex || 0]],
         height: 20
     }))
@@ -284,6 +286,7 @@ function printMetricTable(metrics, functionList) {
     const mData = {}
     const totalValues = {}
     const lastHours = parseInt(argv.hours || 3)
+    const periodMins = parseInt(argv.periods || 300)/60
     const table = new utilities.PrintTable()
     metrics.MetricDataResults.map((m, idx) => {
         const data = {}
@@ -307,7 +310,7 @@ function printMetricTable(metrics, functionList) {
     })
     let dataRows = Object.keys(mData).map(k => mData[k])
     table.addRows(dataRows)
-    table.addRow({ 'Function': `Statistics in ${lastHours} hours`, ...totalValues }, { color: 'white_bold' })
+    table.addRow({ 'Function': `In ${lastHours} hours at every ${periodMins} minutes`, ...totalValues }, { color: 'white_bold' })
     table.printTable()
 }
 
@@ -334,9 +337,9 @@ try {
                         if (typeof argv.plot === 'undefined') {
                             printMetricTable(metrics, functionList)
                         } else {
-							const indexes = argv.plot.split(',')
-							const pIndex = parseInt(indexes[0] || 1) - 1
-							const mIndex = indexes.length > 0 ? parseInt(indexes[1]) - 1 : 0
+                            const indexes = argv.plot.split(',')
+                            const pIndex = parseInt(indexes[0] || 1) - 1
+                            const mIndex = indexes.length > 0 ? parseInt(indexes[1]) - 1 : 0
                             printMetricCharts(metrics, functionList, pIndex < 0 ? 0 : pIndex, mIndex < 0 ? 0 : mIndex)
                         }
                     }).catch(err => simplify.consoleWithMessage(opName, `${err}`))
@@ -355,10 +358,10 @@ try {
                                 areLayersValid = false
                             }
                         })
-						func.LogGroup = func.LogGroup || {}
-						func.functionInfo = func.functionInfo || {}
+                        func.LogGroup = func.LogGroup || {}
+                        func.functionInfo = func.functionInfo || {}
                         const basicView = {
-							Index: idx + 1,
+                            Index: idx + 1,
                             FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
                             CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5, '')} (${func.functionInfo.CodeSha256 === (snapshot || {}).CodeSha256 ? 'OK' : 'NOK'})`,
                             Layers: `${func.Layers.length} (${areLayersValid ? 'OK' : 'NOK'})`,
@@ -368,14 +371,14 @@ try {
                             SecureLog: func.secureLog ? (func.LogGroup.kmsKeyId ? 'YES (OK)' : 'YES (PATCH)') : (func.LogGroup.kmsKeyId ? 'NO (PATCH)' : 'NO (OK)')
                         }
                         const extendedView = {
-							Index: idx + 1,
-							FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
+                            Index: idx + 1,
+                            FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
                             LastModified: utilities.formatTimeSinceAgo(new Date(func.functionInfo.LastModified)),
                             State: func.functionInfo.State,
-                            CodeSize: `${utilities.formatBytes(func.functionInfo.CodeSize)}`,
-							MemorySize: `${func.functionInfo.MemorySize} MB`,
+                            CodeSize: `${utilities.formatBytesToKBMB(parseInt(func.functionInfo.CodeSize))}`,
+                            MemorySize: `${utilities.formatBytesToKBMB(parseInt(func.functionInfo.MemorySize) * 1024 * 1024)}`,
                             Timeout: `${func.functionInfo.Timeout} s`,
-							Runtime: func.functionInfo.Runtime
+                            Runtime: func.functionInfo.Runtime
                         }
                         return isSimpleView ? basicView : extendedView
                     })

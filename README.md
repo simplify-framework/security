@@ -27,29 +27,53 @@ eu-west-1,123456789012,test-function-kms,,90,1,TRUE,FALSE
     + `simplify-secops -p simplify-eu patch -i functions.csv`
 - Monitor deployed functions with standard simple view metrics
   
-  eg: options for last 12 hours with sample in every 300 seconds
+  eg: options for last 12 hours with sample in every 5 mins (5*60 = 300) seconds
     + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12`
   
-  eg: drawing the function data with index=0 as a timeseries chart
-    + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12 --plot 0`
+  eg: drawing the function data with index=1 and INVOCATIONS (1) as a timeseries chart
+    + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12 --plot 1,1`
+
+       2.00 ┼╮ 
+       1.95 ┤│ 
+       1.90 ┤│ 
+       1.85 ┤│ 
+       1.80 ┤│ 
+       1.75 ┤│ 
+       1.70 ┤│ 
+       1.65 ┤│ 
+       1.60 ┤│ 
+       1.55 ┤│ 
+       1.50 ┤│ 
+       1.45 ┤│ 
+       1.40 ┤│ 
+       1.35 ┤│ 
+       1.30 ┤│ 
+       1.25 ┤│ 
+       1.20 ┤│ 
+       1.15 ┤│ 
+       1.10 ┤│ 
+       1.05 ┤│ 
+       1.00 ┤╰ 
+    
+    * 1- Invocations BLUE: 3 | 2- Errors RED: 0 | 3- Max Duration GREEN: 938.53 | 4- Max Concurrency YELLOW: 2 | 5- Throttles WHITE: 4 
 
 ### Example of (security) metrics:
 
------------------------------------------------------------------------------------------------------------
-|           Function |  CodeSHA256 | Layers | LogRetention | EncryptionKey | SecureFunction |   SecureLog |
-|--------------------|-------------|--------|--------------|---------------|----------------|-------------|
-|  test-function-foo | 9AD72= (OK) | 1 (OK) | 90 / 90 (OK) |      KMS (OK) |       YES (OK) |     NO (OK) |
-| foo-secret-manager | f4Bfa= (OK) | 1 (OK) | 90 / 90 (OK) |  Default (OK) |    YES (PATCH) | YES (PATCH) |
-|   foo-user-manager | bcBa1= (OK) | 1 (OK) | 90 / 90 (OK) |  Default (OK) |        NO (OK) |     NO (OK) |
+-------------------------------------------------------------------------------------------------------------------
+| Index |           Function |  CodeSHA256 | Layers | LogRetention | EncryptionKey | SecureFunction |   SecureLog |
+|-------|--------------------|-------------|--------|--------------|---------------|----------------|-------------|
+|     1 |  test-function-foo | 9AD72= (OK) | 1 (OK) | 90 / 90 (OK) |      KMS (OK) |       YES (OK) |     NO (OK) |
+|     2 | foo-secret-manager | f4Bfa= (OK) | 1 (OK) | 90 / 90 (OK) |  Default (OK) |    YES (PATCH) | YES (PATCH) |
+|     3 |   foo-user-manager | bcBa1= (OK) | 1 (OK) | 90 / 90 (OK) |  Default (OK) |        NO (OK) |     NO (OK) |
 
 
 ### Example of (operation) metrics:
 
---------------------------------------------------------------------------------
-|                 Function | Invocations |  Errors |    Duration | Concurrency |
-|--------------------------|-------------|---------|-------------|-------------|
-|        test-function-foo |         120 |       4 |      321.43 |          31 |
-|       foo-secret-manager |           1 |       0 |     1161.00 |           1 |
-|         foo-user-manager |           1 |       0 |      938.53 |           1 |
-|   Statistics in 12 hours |         **122** |       **4** |     **1161.00** |        **33** |
+-----------------------------------------------------------------------------------------
+| Index |                 Function | Invocations |  Errors |    Duration | Concurrency |
+|-------|--------------------------|-------------|---------|-------------|-------------|
+|     1 |        test-function-foo |         120 |       4 |      321.43 |          31 |
+|     2 |       foo-secret-manager |           1 |       0 |     1161.00 |           1 |
+|     3 |         foo-user-manager |           1 |       0 |      938.53 |           1 |
+|       |   Statistics in 12 hours |         **122** |       **4** |     **1161.00** |        **33** |
 

@@ -9,6 +9,7 @@ const utilities = require('simplify-sdk/utilities')
 const asciichart = require('asciichart')
 const GREEN = '\x1b[32m'
 const RED = '\x1b[31m'
+const YELLOW = '\x1b[33m'
 const WHITE = '\x1b[0m'
 const BLUE = '\x1b[34m'
 const RESET = '\x1b[0m'
@@ -86,7 +87,7 @@ function takeSnapshotToFile(functionList, outputPath) {
                     CreatedDate: layer.CreatedDate
                 }
             }),
-            LogGroup: { LogGroupName: f.LogGroup.logGroupName }
+            LogGroup: { LogGroupName: (f.LogGroup || {}).logGroupName }
         }
     }), null, 2), 'utf8');
     simplify.consoleWithMessage(opName, `${cmdOPS} to ${outputPath} \x1b[32m (OK) \x1b[0m`)
@@ -234,44 +235,47 @@ const secOpsFunctions = function (files, callback) {
     }
 }
 
-function printMetricCharts(metrics, functionList, index) {
-    const functionName = functionList[index].functionInfo.FunctionName
+function printMetricCharts(metrics, functionList, pIndex, mIndex) {
+    const functionName = functionList[pIndex].functionInfo.FunctionName
     const lastHours = parseInt(argv.hours || 3)
     const totalValues = {}
     const series = metrics.MetricDataResults.map(m => {
-        if (!m.Values.length) {
-            m.Values.push(0)
-        }
-        const totalPeriodValue = parseFloat(m.Values.reduce((count, x) => count + x, 0))
-        const functionId = m.Id.split('_')[1]
-        const labelValue = `${m.Label}`
-        if (!totalValues[labelValue]) totalValues[labelValue] = 0
-        if (labelValue === 'Duration' || labelValue === 'Concurrency') {
-            totalValues[labelValue] = Math.max(totalValues[labelValue], ...m.Values)
-            totalValues[labelValue] = (labelValue === 'Duration' ? totalValues[labelValue].toFixed(2) : totalValues[labelValue])
-        } else {
-            totalValues[labelValue] += totalPeriodValue
-        }
-        if (functionId == index)
+		const functionId = m.Id.split('_')[1]
+		const labelValue = `${m.Label}`
+        if (functionId == pIndex) {
+			if (!m.Values.length) {
+				m.Values.push(0)
+			}
+			const totalPeriodValue = parseFloat(m.Values.reduce((count, x) => count + x, 0))
+			if (!totalValues[labelValue]) totalValues[labelValue] = 0
+			if (labelValue === 'Duration' || labelValue === 'Concurrency') {
+				totalValues[labelValue] = Math.max(totalValues[labelValue], ...m.Values)
+				totalValues[labelValue] = (labelValue === 'Duration' ? (totalValues[labelValue]).toFixed(2) : totalValues[labelValue])
+			} else {
+				totalValues[labelValue] += totalPeriodValue
+			}
             return m.Values
+		}
         return undefined
     }).filter(m => m)
-    console.log(`\n * (${functionName}): metric in the last ${lastHours} hours [ Invocations: ${BLUE}BLUE${RESET} - Errors: ${RED}RED${RESET} - Concurrency: ${GREEN}GREEN${RESET} - Throttles: ${WHITE}WHITE${RESET} ]\n`)
-    console.log(asciichart.plot(series.slice(0, 3), {
-        colors: [
-            asciichart.blue,
-            asciichart.red,
-            asciichart.green,
-            asciichart.default
-        ],
+    console.log(`\n * (${functionName}): metric in the last ${lastHours} hours \n`)
+	const pColors = [
+		asciichart.blue,
+		asciichart.red,
+		asciichart.green,
+		asciichart.yellow,
+		asciichart.default
+	]
+    console.log(asciichart.plot(series.splice(mIndex || 0,1), {
+        colors: [pColors[mIndex || 0]],
         height: 20
     }))
     const totalLabels = {
-        "Invocations": "Total Invocation",
-        "Duration": "Max Duration",
-        "Concurrency": "Max Concurrency",
-        "Errors": "Total Errors",
-        "Throttles": "Total Throttle"
+        "Invocations": `1- Invocations ${BLUE}BLUE${RESET}`,
+        "Errors": `2- Errors ${RED}RED${RESET}`,
+        "Duration": `3- Max Duration ${GREEN}GREEN${RESET}`,
+        "Concurrency": `4- Max Concurrency ${YELLOW}YELLOW${RESET}`,
+        "Throttles": `5- Throttles ${WHITE}WHITE${RESET}`
     }
     console.log(`\n * ${Object.keys(totalValues).map(kv => `${totalLabels[kv]}: ${totalValues[kv]}`).join(' | ')} \n`)
 }
@@ -281,7 +285,7 @@ function printMetricTable(metrics, functionList) {
     const totalValues = {}
     const lastHours = parseInt(argv.hours || 3)
     const table = new utilities.PrintTable()
-    metrics.MetricDataResults.map(m => {
+    metrics.MetricDataResults.map((m, idx) => {
         const data = {}
         const labelValue = `${m.Label}`
         if (!m.Values.length) {
@@ -299,7 +303,7 @@ function printMetricTable(metrics, functionList) {
         const functionName = functionList[functionId].functionInfo.FunctionName
         data[labelValue] = (labelValue === 'Duration' || labelValue === 'Concurrency' ? Math.max(...m.Values) : totalPeriodValue)
         data[labelValue] = (labelValue === 'Duration' ? data[labelValue].toFixed(2) : data[labelValue])
-        mData[functionId] = { 'Function': functionName.truncateLeft(50), ...mData[functionId], ...data }
+        mData[functionId] = { 'Index': (parseInt(functionId) + 1), 'Function': functionName.truncateLeft(50), ...mData[functionId], ...data }
     })
     let dataRows = Object.keys(mData).map(k => mData[k])
     table.addRows(dataRows)
@@ -330,7 +334,10 @@ try {
                         if (typeof argv.plot === 'undefined') {
                             printMetricTable(metrics, functionList)
                         } else {
-                            printMetricCharts(metrics, functionList, parseInt(argv.plot || 0))
+							const indexes = argv.plot.split(',')
+							const pIndex = parseInt(indexes[0] || 1) - 1
+							const mIndex = indexes.length > 0 ? parseInt(indexes[1]) - 1 : 0
+                            printMetricCharts(metrics, functionList, pIndex < 0 ? 0 : pIndex, mIndex < 0 ? 0 : mIndex)
                         }
                     }).catch(err => simplify.consoleWithMessage(opName, `${err}`))
                 } else if (cmdOPS === 'VERIFY') {
@@ -339,7 +346,7 @@ try {
                         isSimpleView = false
                     }
                     const snapshotList = getSnapshotFromFile(path.resolve(argv.output, `${argv.baseline || '$LATEST'}.json`))
-                    const outputTable = functionList.map(func => {
+                    const outputTable = functionList.map((func, idx) => {
                         const snapshot = snapshotList ? snapshotList.find(f => f.FunctionName === func.functionInfo.FunctionName) : { Layers: [] }
                         var areLayersValid = snapshotList ? true : false
                         snapshot && snapshot.Layers.map(layer => {
@@ -348,7 +355,10 @@ try {
                                 areLayersValid = false
                             }
                         })
+						func.LogGroup = func.LogGroup || {}
+						func.functionInfo = func.functionInfo || {}
                         const basicView = {
+							Index: idx + 1,
                             FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
                             CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5, '')} (${func.functionInfo.CodeSha256 === (snapshot || {}).CodeSha256 ? 'OK' : 'NOK'})`,
                             Layers: `${func.Layers.length} (${areLayersValid ? 'OK' : 'NOK'})`,
@@ -358,12 +368,13 @@ try {
                             SecureLog: func.secureLog ? (func.LogGroup.kmsKeyId ? 'YES (OK)' : 'YES (PATCH)') : (func.LogGroup.kmsKeyId ? 'NO (PATCH)' : 'NO (OK)')
                         }
                         const extendedView = {
+							Index: idx + 1,
 							FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
-                            LastModified: new Date(func.functionInfo.LastModified).toISOString(),
+                            LastModified: utilities.formatTimeSinceAgo(new Date(func.functionInfo.LastModified)),
                             State: func.functionInfo.State,
-                            CodeSize: `${func.functionInfo.CodeSize} bytes`,
+                            CodeSize: `${utilities.formatBytes(func.functionInfo.CodeSize)}`,
 							MemorySize: `${func.functionInfo.MemorySize} MB`,
-                            Timeout: `${func.functionInfo.Timeout} secs`,
+                            Timeout: `${func.functionInfo.Timeout} s`,
 							Runtime: func.functionInfo.Runtime
                         }
                         return isSimpleView ? basicView : extendedView

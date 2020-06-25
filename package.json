@@ -1,6 +1,6 @@
 {
   "name": "simplify-secops",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Simplify Security & Operation Interface",
   "main": "entrypoint.js",
   "bin": {

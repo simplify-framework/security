@@ -354,7 +354,7 @@ try {
                         var areLayersValid = snapshotList ? true : false
                         snapshot && snapshot.Layers.map(layer => {
                             const layerInfo = func.Layers.find(info => info.LayerVersionArn === layer.LayerVersionArn)
-                            if (layerInfo.Content.CodeSha256 !== layer.CodeSha256) {
+                            if (layerInfo && layerInfo.Content.CodeSha256 !== layer.CodeSha256) {
                                 areLayersValid = false
                             }
                         })

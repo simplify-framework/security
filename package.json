@@ -1,6 +1,6 @@
 {
   "name": "simplify-security",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Simplify Security & Operation Interface",
   "main": "entrypoint.js",
   "bin": {
@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/simplify-framework/security#readme",
   "dependencies": {
+    "yargs": "^16.2.0",
     "asciichart": "^1.5.21",
     "mkdirp": "^1.0.4",
     "simplify-sdk": "^0.1.49"

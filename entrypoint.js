@@ -418,7 +418,7 @@ const processReport = function () {
                     name: v.name.truncateLeft(30),
                     severity: v.severity || '',
                     category: v.category || '',
-                    identifier: (v.identifiers || []).map(i => i.type == 'cwe' ? i.name : undefined).filter(o => o),
+                    identifier: (v.identifiers || []).map(i => i.type == 'cwe' ? undefined : i.value).filter(o => o),
                     location: v.location.file.truncateLeft(30)
                 }
             }))

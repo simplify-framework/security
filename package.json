@@ -1,10 +1,10 @@
 {
   "name": "simplify-security",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Simplify Security & Operation Interface",
   "main": "entrypoint.js",
   "bin": {
-    "simplify-secops": "entrypoint.js"
+    "simplify-security": "entrypoint.js"
   },
   "scripts": {
     "test": "npm run test"

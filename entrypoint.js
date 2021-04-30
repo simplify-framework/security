@@ -64,17 +64,6 @@ var files = []
 var headers = []
 var securityReports = {}
 var securityServerity = { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
-try {
-    var fileContent = require('fs').readFileSync(path.resolve(configInputFile), 'utf-8')
-    if (fileFormat == 'CSV') {
-        files = fileContent.split(/\r?\n/)
-        headers = files[lineIndex++]
-    } else if (fileFormat == 'JSON') {
-        securityReports = JSON.parse(fileContent)
-    }
-} catch (e) {
-    console.log(e)
-}
 
 function getSnapshotFromFile(snapshotPath) {
     simplify.consoleWithMessage(opName, `${cmdOPS} Snapshot from ${snapshotPath}`)
@@ -330,109 +319,125 @@ function printMetricTable(metrics, functionList) {
     table.printTable()
 }
 
-try {
-    var config = simplify.getInputConfig({
-        Region: argv.region || 'eu-west-1',
-        Profile: argv.profile || 'default',
-        Bucket: { Name: 'default' }
-    })
-    provider.setConfig(config).then(function () {
-        if (headers.startsWith('Region')) {
-            secOpsFunctions(files, function (functionList) {
-                if (cmdOPS === 'METRIC') {
-                    let startDate = new Date()
-                    const lastHours = parseInt(argv.hours || 3)
-                    startDate.setHours(startDate.getHours() - (lastHours))
-                    simplify.getFunctionMetricData({
-                        adaptor: provider.getMetrics(),
-                        functions: functionList.map(f => { return { FunctionName: f.functionInfo.FunctionName } }),
-                        periods: parseInt(argv.periods || 300),
-                        startDate: startDate,
-                        endDate: new Date()
-                    }).then(metrics => {
-                        if (typeof argv.plot === 'undefined') {
-                            printMetricTable(metrics, functionList)
-                        } else {
-                            const indexes = argv.plot.split(',')
-                            const pIndex = parseInt(indexes[0] || 1) - 1
-                            const mIndex = indexes.length > 0 ? parseInt(indexes[1]) - 1 : 0
-                            printMetricCharts(metrics, functionList, pIndex < 0 ? 0 : pIndex, mIndex < 0 ? 0 : mIndex)
-                        }
-                    }).catch(err => simplify.consoleWithMessage(opName, `${err}`))
-                } else if (cmdOPS === 'VERIFY') {
-                    let isSimpleView = true
-                    if (typeof argv.extended !== 'undefined') {
-                        isSimpleView = false
-                    }
-                    const snapshotList = getSnapshotFromFile(path.resolve(argv.output, `${argv.baseline || '$LATEST'}.json`))
-                    const outputTable = functionList.map((func, idx) => {
-                        const snapshot = snapshotList ? snapshotList.find(f => f.FunctionName === func.functionInfo.FunctionName) : { Layers: [] }
-                        var areLayersValid = snapshotList ? true : false
-                        snapshot && snapshot.Layers.map(layer => {
-                            const layerInfo = func.Layers.find(info => info.LayerVersionArn === layer.LayerVersionArn)
-                            if (layerInfo && layerInfo.Content.CodeSha256 !== layer.CodeSha256) {
-                                areLayersValid = false
+const processLambda = function () {
+    try {
+        var config = simplify.getInputConfig({
+            Region: argv.region || 'eu-west-1',
+            Profile: argv.profile || 'default',
+            Bucket: { Name: 'default' }
+        })
+        provider.setConfig(config).then(function () {
+            if (headers.startsWith('Region')) {
+                secOpsFunctions(files, function (functionList) {
+                    if (cmdOPS === 'METRIC') {
+                        let startDate = new Date()
+                        const lastHours = parseInt(argv.hours || 3)
+                        startDate.setHours(startDate.getHours() - (lastHours))
+                        simplify.getFunctionMetricData({
+                            adaptor: provider.getMetrics(),
+                            functions: functionList.map(f => { return { FunctionName: f.functionInfo.FunctionName } }),
+                            periods: parseInt(argv.periods || 300),
+                            startDate: startDate,
+                            endDate: new Date()
+                        }).then(metrics => {
+                            if (typeof argv.plot === 'undefined') {
+                                printMetricTable(metrics, functionList)
+                            } else {
+                                const indexes = argv.plot.split(',')
+                                const pIndex = parseInt(indexes[0] || 1) - 1
+                                const mIndex = indexes.length > 0 ? parseInt(indexes[1]) - 1 : 0
+                                printMetricCharts(metrics, functionList, pIndex < 0 ? 0 : pIndex, mIndex < 0 ? 0 : mIndex)
                             }
+                        }).catch(err => simplify.consoleWithMessage(opName, `${err}`))
+                    } else if (cmdOPS === 'VERIFY') {
+                        let isSimpleView = true
+                        if (typeof argv.extended !== 'undefined') {
+                            isSimpleView = false
+                        }
+                        const snapshotList = getSnapshotFromFile(path.resolve(argv.output, `${argv.baseline || '$LATEST'}.json`))
+                        const outputTable = functionList.map((func, idx) => {
+                            const snapshot = snapshotList ? snapshotList.find(f => f.FunctionName === func.functionInfo.FunctionName) : { Layers: [] }
+                            var areLayersValid = snapshotList ? true : false
+                            snapshot && snapshot.Layers.map(layer => {
+                                const layerInfo = func.Layers.find(info => info.LayerVersionArn === layer.LayerVersionArn)
+                                if (layerInfo && layerInfo.Content.CodeSha256 !== layer.CodeSha256) {
+                                    areLayersValid = false
+                                }
+                            })
+                            func.LogGroup = func.LogGroup || {}
+                            func.functionInfo = func.functionInfo || {}
+                            const basicView = {
+                                Index: idx + 1,
+                                FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
+                                CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5, '')} (${func.functionInfo.CodeSha256 === (snapshot || {}).CodeSha256 ? 'OK' : 'NOK'})`,
+                                Layers: `${func.Layers.length} (${areLayersValid ? 'OK' : 'NOK'})`,
+                                LogRetention: `${func.LogGroup.retentionInDays || '-'} / ${func.logRetention || '-'} (${func.LogGroup.retentionInDays == func.logRetention ? 'OK' : 'PATCH'})`,
+                                EncryptionKey: (func.customKmsArn ? `KMS ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}` : `${func.functionInfo.KMSKeyArn ? 'KMS' : '-'} ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`).truncateLeft(13),
+                                SecureFunction: func.secureFunction ? (func.functionInfo.KMSKeyArn ? 'YES (OK)' : 'YES (PATCH)') : (func.functionInfo.KMSKeyArn ? 'NO (PATCH)' : 'NO (OK)'),
+                                SecureLog: func.secureLog ? (func.LogGroup.kmsKeyId ? 'YES (OK)' : 'YES (PATCH)') : (func.LogGroup.kmsKeyId ? 'NO (PATCH)' : 'NO (OK)')
+                            }
+                            const extendedView = {
+                                Index: idx + 1,
+                                FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
+                                LastModified: utilities.formatTimeSinceAgo(new Date(func.functionInfo.LastModified)),
+                                State: func.functionInfo.State,
+                                CodeSize: `${utilities.formatBytesToKBMB(parseInt(func.functionInfo.CodeSize))}`,
+                                MemorySize: `${utilities.formatBytesToKBMB(parseInt(func.functionInfo.MemorySize) * 1024 * 1024)}`,
+                                Timeout: `${func.functionInfo.Timeout} s`,
+                                Runtime: func.functionInfo.Runtime
+                            }
+                            return isSimpleView ? basicView : extendedView
                         })
-                        func.LogGroup = func.LogGroup || {}
-                        func.functionInfo = func.functionInfo || {}
-                        const basicView = {
-                            Index: idx + 1,
-                            FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
-                            CodeSha256: `${func.functionInfo.CodeSha256.truncateLeft(5, '')} (${func.functionInfo.CodeSha256 === (snapshot || {}).CodeSha256 ? 'OK' : 'NOK'})`,
-                            Layers: `${func.Layers.length} (${areLayersValid ? 'OK' : 'NOK'})`,
-                            LogRetention: `${func.LogGroup.retentionInDays || '-'} / ${func.logRetention || '-'} (${func.LogGroup.retentionInDays == func.logRetention ? 'OK' : 'PATCH'})`,
-                            EncryptionKey: (func.customKmsArn ? `KMS ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}` : `${func.functionInfo.KMSKeyArn ? 'KMS' : '-'} ${func.functionInfo.KMSKeyArn === func.customKmsArn ? '(OK)' : '(PATCH)'}`).truncateLeft(13),
-                            SecureFunction: func.secureFunction ? (func.functionInfo.KMSKeyArn ? 'YES (OK)' : 'YES (PATCH)') : (func.functionInfo.KMSKeyArn ? 'NO (PATCH)' : 'NO (OK)'),
-                            SecureLog: func.secureLog ? (func.LogGroup.kmsKeyId ? 'YES (OK)' : 'YES (PATCH)') : (func.LogGroup.kmsKeyId ? 'NO (PATCH)' : 'NO (OK)')
-                        }
-                        const extendedView = {
-                            Index: idx + 1,
-                            FunctionName: func.functionInfo.FunctionName.truncateLeft(50),
-                            LastModified: utilities.formatTimeSinceAgo(new Date(func.functionInfo.LastModified)),
-                            State: func.functionInfo.State,
-                            CodeSize: `${utilities.formatBytesToKBMB(parseInt(func.functionInfo.CodeSize))}`,
-                            MemorySize: `${utilities.formatBytesToKBMB(parseInt(func.functionInfo.MemorySize) * 1024 * 1024)}`,
-                            Timeout: `${func.functionInfo.Timeout} s`,
-                            Runtime: func.functionInfo.Runtime
-                        }
-                        return isSimpleView ? basicView : extendedView
-                    })
-                    utilities.printTableWithJSON(outputTable)
-                } else if (cmdOPS === 'SNAPSHOT') {
-                    takeSnapshotToFile(functionList, path.resolve(argv.output, `${utilities.getDateToday()}.json`))
-                    takeSnapshotToFile(functionList, path.resolve(argv.output, `$LATEST.json`))
-                } else {
+                        utilities.printTableWithJSON(outputTable)
+                    } else if (cmdOPS === 'SNAPSHOT') {
+                        takeSnapshotToFile(functionList, path.resolve(argv.output, `${utilities.getDateToday()}.json`))
+                        takeSnapshotToFile(functionList, path.resolve(argv.output, `$LATEST.json`))
+                    } else {
 
-                }
-            })
-        }
-    })
-} catch (err) {
-    simplify.finishWithErrors(`${opName}-Function`, err)
+                    }
+                })
+            }
+        })
+    } catch (err) {
+        simplify.finishWithErrors(`${opName}-Function`, err)
+    }
 }
 
-try {
-    if (cmdOPS === 'REPORT') {
-        utilities.printTableWithJSON(securityReports.vulnerabilities.map((v, idx) => {
-            securityServerity.critical += v.severity == 'Critical' ? 1 : 0
-            securityServerity.high += v.severity == 'High' ? 1 : 0
-            securityServerity.medium += v.severity == 'Medium' ? 1 : 0
-            securityServerity.low += v.severity == 'Low' ? 1 : 0
-            securityServerity.info += v.severity == 'Unknown' ? 1 : 0
-            return {
-                index: idx + 1,
-                name: v.name.truncateLeft(30),
-                severity: v.severity,
-                category: v.category,
-                identifier: v.identifiers.map(i => i.type == 'cwe' ? i.name : undefined).filter(o => o),
-                location: v.location.file.truncateLeft(30)
+const processReport = function () {
+    try {
+        if (cmdOPS === 'REPORT') {
+            utilities.printTableWithJSON(securityReports.vulnerabilities.map((v, idx) => {
+                securityServerity.critical += v.severity == 'Critical' ? 1 : 0
+                securityServerity.high += v.severity == 'High' ? 1 : 0
+                securityServerity.medium += v.severity == 'Medium' ? 1 : 0
+                securityServerity.low += v.severity == 'Low' ? 1 : 0
+                securityServerity.info += v.severity == 'Unknown' ? 1 : 0
+                return {
+                    index: idx + 1,
+                    name: v.name.truncateLeft(30),
+                    severity: v.severity,
+                    category: v.category,
+                    identifier: v.identifiers.map(i => i.type == 'cwe' ? i.name : undefined).filter(o => o),
+                    location: v.location.file.truncateLeft(30)
+                }
+            }))
+            if (securityServerity.critical || securityServerity.high) {
+                throw (`Analysed security report ${configInputFile} we had found (${securityServerity.critical}) in CRITICAL and (${securityServerity.high}) in HIGH severity that STOPPED you continuing your work.`)
             }
-        }))
-        if (securityServerity.critical || securityServerity.high) {
-            throw (`Analysed security report ${configInputFile} we had found (${securityServerity.critical}) in CRITICAL and (${securityServerity.high}) in HIGH severity that STOPPED you continuing your work.`)
         }
+    } catch (err) {
+        simplify.finishWithErrors(`${opName}-Report`, err)
     }
-} catch (err) {
-    simplify.finishWithErrors(`${opName}-Report`, err)
+}
+
+if (fs.existsSync(path.resolve(configInputFile))) {
+    var fileContent = fs.readFileSync(path.resolve(configInputFile), 'utf-8')
+    if (fileFormat == 'CSV') {
+        files = fileContent.split(/\r?\n/)
+        headers = files[lineIndex++]
+        processLambda()
+    } else if (fileFormat == 'JSON') {
+        securityReports = JSON.parse(fileContent)
+        processReport()
+    }
 }

@@ -1,6 +1,6 @@
 {
   "name": "simplify-security",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Simplify Security & Operation Interface",
   "main": "entrypoint.js",
   "bin": {

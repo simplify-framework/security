@@ -1,11 +1,11 @@
 # Security & Operation
 
-![NPM Downloads](https://img.shields.io/npm/dw/simplify-secops)
+![NPM Downloads](https://img.shields.io/npm/dw/simplify-security)
 ![Package Version](https://img.shields.io/github/package-json/v/simplify-framework/security?color=green)
 
 This project aims to cover SecOps for AWS Lambda serverless first. To use this package, install it as a global comand line tool:
 
-`npm install -g simplify-secops`
+`npm install -g simplify-security`
 
 
 ### Define a function list in CSV format:
@@ -16,22 +16,22 @@ eu-west-1,123456789012,test-function-kms,,90,1,TRUE,FALSE
 
 ### Command Line Support:
 - Verify deployed functions against your list of definitions
-    + `simplify-secops -p simplify-eu verify -i functions.csv --simple`
+    + `simplify-security -p simplify-eu verify -i functions.csv --simple`
 - Record a snapshot with current state of functions
-    + `simplify-secops -p simplify-eu snapshot -i functions.csv -o .snapshot`
+    + `simplify-security -p simplify-eu snapshot -i functions.csv -o .snapshot`
 - Verify deployed functions with a specified snapshot date
-    + `simplify-secops -p simplify-eu verify -i functions.csv -b 2020-06-21`
+    + `simplify-security -p simplify-eu verify -i functions.csv -b 2020-06-21`
 - Check deployed functions and functions' parameters
-    + `simplify-secops -p simplify-eu check -i functions.csv`
+    + `simplify-security -p simplify-eu check -i functions.csv`
 - Patch deployed functions with functions' parameters
-    + `simplify-secops -p simplify-eu patch -i functions.csv`
+    + `simplify-security -p simplify-eu patch -i functions.csv`
 - Monitor deployed functions with standard simple view metrics
   
   eg: options for last 12 hours with sample in every 5 mins (5*60 = 300) seconds
-    + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12`
+    + `simplify-security -p simplify-eu metric -i functions.csv -t 300 -h 12`
   
   eg: drawing the function data with index=1 and INVOCATIONS (1) as a timeseries chart
-    + `simplify-secops -p simplify-eu metric -i functions.csv -t 300 -h 12 --plot 1,1`
+    + `simplify-security -p simplify-eu metric -i functions.csv -t 300 -h 12 --plot 1,1`
 
        2.00 ┼╮ 
        1.95 ┤│ 

@@ -418,8 +418,11 @@ const processReport = function () {
                     return {
                         index: idx + 1,
                         severity: v.severity == 'Unknown' ? 'Information' : (v.severity || ''),
-                        category: v.category || '',
-                        identifier: (v.identifiers || []).map(i => i.type == 'cwe' ? undefined : i.value).filter(o => o),
+                        category: v.category == 'secret_detection' ? 'secret' : (v.category || ''),
+                        identifier: (v.identifiers || []).map(i => i.type == 'eslint_rule_id' ?
+                            i.value : i.type == 'njsscan_rule_type' ?
+                                `name/${i.name}` : i.type == 'gitleaks_rule_id' ? `secret-type/${i.value}` :
+                                    i.type !== 'cwe' ? `${i.type}/${i.value.truncateLeft(10)}` : undefined).filter(o => o),
                         location: v.location.file.truncateLeft(30),
                         lines: `${v.location.start_line}/${v.location.end_line}`
                     }

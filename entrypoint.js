@@ -13,14 +13,17 @@ const YELLOW = '\x1b[33m'
 const WHITE = '\x1b[0m'
 const BLUE = '\x1b[34m'
 const RESET = '\x1b[0m'
-const opName = `SecOps`
+const opName = `Security`
 
 var argv = require('yargs')
-    .usage('simplify-secops verify|patch|check|metric|snapshot [options]')
+    .usage('simplify-security report|verify|patch|check|metric|snapshot [options]')
     .string('input')
     .alias('i', 'input')
-    .describe('input', 'Input file contains function list')
+    .describe('input', 'Input lambda functions.csv file or *.JSON security report file')
     .default('input', 'functions.csv')
+    .string('format')
+    .alias('f', 'format')
+    .describe('format', 'Input file format either CSV or JSON')
     .string('output')
     .alias('o', 'output')
     .describe('output', 'Output snapshot folder')
@@ -54,11 +57,24 @@ var argv = require('yargs')
 var configInputFile = argv.input || 'functions.csv'
 var scanOutput = {}
 var cmdOPS = (argv._[0] || 'verify').toUpperCase()
+var fileFormat = (typeof argv.format === 'undefined' ? (cmdOPS == 'REPORT' ? 'JSON' : 'CSV') : 'CSV').toUpperCase()
 var lineIndex = 0
 var funcList = []
-
-var files = require('fs').readFileSync(path.resolve(configInputFile), 'utf-8').split(/\r?\n/)
-var headers = files[lineIndex++]
+var files = []
+var headers = []
+var securityReports = {}
+var securityServerity = { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
+try {
+    var fileContent = require('fs').readFileSync(path.resolve(configInputFile), 'utf-8')
+    if (fileFormat == 'CSV') {
+        files = fileContent.split(/\r?\n/)
+        headers = files[lineIndex++]
+    } else if (fileFormat == 'JSON') {
+        securityReports = JSON.parse(fileContent)
+    }
+} catch (e) {
+    console.log(e)
+}
 
 function getSnapshotFromFile(snapshotPath) {
     simplify.consoleWithMessage(opName, `${cmdOPS} Snapshot from ${snapshotPath}`)
@@ -239,7 +255,7 @@ function printMetricCharts(metrics, functionList, pIndex, mIndex) {
     pIndex = pIndex < functionList.length ? pIndex : 0
     const functionName = functionList[pIndex].functionInfo.FunctionName
     const lastHours = parseInt(argv.hours || 3)
-    const periodMins = parseInt(argv.periods || 300)/60
+    const periodMins = parseInt(argv.periods || 300) / 60
     const totalValues = {}
     const series = metrics.MetricDataResults.map(m => {
         const functionId = m.Id.split('_')[1]
@@ -286,7 +302,7 @@ function printMetricTable(metrics, functionList) {
     const mData = {}
     const totalValues = {}
     const lastHours = parseInt(argv.hours || 3)
-    const periodMins = parseInt(argv.periods || 300)/60
+    const periodMins = parseInt(argv.periods || 300) / 60
     const table = new utilities.PrintTable()
     metrics.MetricDataResults.map((m, idx) => {
         const data = {}
@@ -386,10 +402,37 @@ try {
                 } else if (cmdOPS === 'SNAPSHOT') {
                     takeSnapshotToFile(functionList, path.resolve(argv.output, `${utilities.getDateToday()}.json`))
                     takeSnapshotToFile(functionList, path.resolve(argv.output, `$LATEST.json`))
+                } else {
+
                 }
             })
         }
     })
 } catch (err) {
-    simplify.finishWithErrors(`${opName}-LoadConfig`, err)
+    simplify.finishWithErrors(`${opName}-Function`, err)
+}
+
+try {
+    if (cmdOPS === 'REPORT') {
+        utilities.printTableWithJSON(securityReports.vulnerabilities.map(v => {
+            securityServerity.critical += v.severity == 'Critical' ? 1 : 0
+            securityServerity.high += v.severity == 'High' ? 1 : 0
+            securityServerity.medium += v.severity == 'Medium' ? 1 : 0
+            securityServerity.low += v.severity == 'Low' ? 1 : 0
+            securityServerity.info += v.severity == 'Unknown' ? 1 : 0
+            return {
+                id: v.id.truncateLeft(10),
+                name: v.name.truncateLeft(30),
+                severity: v.severity,
+                category: v.category,
+                identifier: v.identifiers.map(i => i.type == 'cwe' ? i.name : undefined).filter(o => o),
+                location: v.location.file.truncateLeft(50)
+            }
+        }))
+        if (securityServerity.critical || securityServerity.high) {
+            throw (`Analysed security report ${configInputFile} we had found (${securityServerity.critical}) in CRITICAL and (${securityServerity.high}) in HIGH severity that STOPPED you continuing your work.`)
+        }
+    }
+} catch (err) {
+    simplify.finishWithErrors(`${opName}-Report`, err)
 }

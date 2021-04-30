@@ -420,7 +420,8 @@ const processReport = function () {
                         severity: v.severity == 'Unknown' ? 'Information' : (v.severity || ''),
                         category: v.category || '',
                         identifier: (v.identifiers || []).map(i => i.type == 'cwe' ? undefined : i.value).filter(o => o),
-                        location: v.location.file.truncateLeft(40)
+                        location: v.location.file.truncateLeft(40),
+                        lines: `${v.location.start_line}/${v.location.end_line}`
                     }
                 }))
                 if (securityServerity.critical || securityServerity.high) {

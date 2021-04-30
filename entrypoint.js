@@ -12,6 +12,7 @@ const RED = '\x1b[31m'
 const YELLOW = '\x1b[33m'
 const WHITE = '\x1b[0m'
 const BLUE = '\x1b[34m'
+const VIOLET = '\x1b[35m'
 const RESET = '\x1b[0m'
 const opName = `Security`
 
@@ -416,14 +417,14 @@ const processReport = function () {
                 return {
                     index: idx + 1,
                     name: v.name.truncateLeft(30),
-                    severity: v.severity || '',
+                    severity: v.severity == 'Unknown' ? 'Information' : (v.severity || ''),
                     category: v.category || '',
                     identifier: (v.identifiers || []).map(i => i.type == 'cwe' ? undefined : i.value).filter(o => o),
                     location: v.location.file.truncateLeft(30)
                 }
             }))
             if (securityServerity.critical || securityServerity.high) {
-                throw (`Analysed security report ${configInputFile} we had found (${securityServerity.critical}) in CRITICAL and (${securityServerity.high}) in HIGH severity that STOPPED you continuing your work.`)
+                throw (`${RED}ERROR ${RESET}from ${RESET}${configInputFile}${RESET} - There are ${securityServerity.critical} ${VIOLET}(CRITICAL)${RESET} and ${securityServerity.high} ${YELLOW}(HIGH)${RESET} severity findings.${RESET}`)
             }
         }
     } catch (err) {

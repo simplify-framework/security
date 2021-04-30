@@ -406,7 +406,8 @@ const processLambda = function () {
 const processReport = function () {
     try {
         if (cmdOPS === 'REPORT') {
-            utilities.printTableWithJSON(securityReports.vulnerabilities.map((v, idx) => {
+            const vulnerabilities = securityReports.vulnerabilities || []
+            utilities.printTableWithJSON(vulnerabilities.map((v, idx) => {
                 securityServerity.critical += v.severity == 'Critical' ? 1 : 0
                 securityServerity.high += v.severity == 'High' ? 1 : 0
                 securityServerity.medium += v.severity == 'Medium' ? 1 : 0
@@ -415,9 +416,9 @@ const processReport = function () {
                 return {
                     index: idx + 1,
                     name: v.name.truncateLeft(30),
-                    severity: v.severity,
-                    category: v.category,
-                    identifier: v.identifiers.map(i => i.type == 'cwe' ? i.name : undefined).filter(o => o),
+                    severity: v.severity || '',
+                    category: v.category || '',
+                    identifier: (v.identifiers || []).map(i => i.type == 'cwe' ? i.name : undefined).filter(o => o),
                     location: v.location.file.truncateLeft(30)
                 }
             }))

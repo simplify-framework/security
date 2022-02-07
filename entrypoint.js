@@ -6,7 +6,8 @@ const mkdirp = require('mkdirp')
 const simplify = require('simplify-sdk')
 const provider = require('simplify-sdk/provider')
 const utilities = require('simplify-sdk/utilities')
-const asciichart = require('asciichart')
+const asciichart = require('asciichart');
+const { resolve } = require('path');
 const GREEN = '\x1b[32m'
 const RED = '\x1b[31m'
 const YELLOW = '\x1b[33m'
@@ -14,14 +15,18 @@ const WHITE = '\x1b[0m'
 const BLUE = '\x1b[34m'
 const VIOLET = '\x1b[35m'
 const RESET = '\x1b[0m'
-const opName = `Security`
+const opName = `SecurityOps`
 
 var argv = require('yargs')
-    .usage('simplify-security report|verify|patch|check|metric|snapshot [options]')
+    .usage('simplify-security export|report|verify|patch|check|metric|snapshot| [options]')
     .string('input')
     .alias('i', 'input')
     .describe('input', 'Input lambda functions.csv file or *.JSON security report file')
     .default('input', 'functions.csv')
+    .string('searchFor')
+    .describe('searchFor', 'Search for a term in function name')
+    .string('searchInAlias')
+    .describe('searchInAlias', 'Search a function has an alias in its configuration')
     .string('format')
     .alias('f', 'format')
     .describe('format', 'Input file format either CSV or JSON')
@@ -86,6 +91,11 @@ function takeSnapshotToFile(functionList, outputPath) {
             CodeSha256: f.functionInfo.CodeSha256,
             LastModified: f.functionInfo.LastModified,
             Version: f.functionInfo.Version,
+            RoleARN: f.functionInfo.Role,
+            RolePolicy: f.functionInfo.RolePolicy,
+            ResourcePolicy: f.functionInfo.ResourcePolicy,
+            Runtime: f.functionInfo.Runtime,
+            Handler: f.functionInfo.Handler,
             Layers: f.Layers.map(layer => {
                 return {
                     CodeSha256: layer.Content.CodeSha256,
@@ -217,23 +227,39 @@ const secOpsFunctions = function (files, callback) {
                 simplify.getFunctionMetaInfos({
                     adaptor: provider.getFunction(),
                     logger: provider.getLogger(),
-                    functionConfig: { FunctionName: functionName, Qualifier: functionVersion },
+                    functionConfig: { FunctionName: functionName, Version: functionVersion },
                     silentIs: true
                 }).then(function (functionMeta) {
                     const functionInfo = functionMeta.Configuration
-                    if (!scanOutput[functionInfo.FunctionName]) {
-                        scanOutput[functionInfo.FunctionName] = {}
-                    }
-                    scanOutput[functionInfo.FunctionName] = functionInfo
-                    analyseOrPatch({ functionInfo, logRetention, customKmsArn, secureFunction, secureLog }).then(res => {
-                        funcList.push({ ...res, Layers: functionMeta.LayerInfos, LogGroup: functionMeta.LogGroup })
-                        if (lineIndex >= files.length) {
-                            callback && callback(funcList)
-                        } else {
-                            secOpsFunctions(files, callback)
+                    simplify.getFunctionRolePolicies({
+                        adaptor: provider.getIAM(),
+                        functionConfig: { FunctionName: functionName, Version: functionVersion, ...functionInfo }
+                    }).then(function (roleData) {
+                        functionInfo.RolePolicy = roleData
+                        if (!scanOutput[functionInfo.FunctionName]) {
+                            scanOutput[functionInfo.FunctionName] = {}
                         }
-                    }).catch(err => simplify.consoleWithMessage(opName, `${cmdOPS} ${functionInfo.FunctionName}: ${err} \x1b[31m (ERROR) \x1b[0m`))
-                }).catch(err => simplify.consoleWithMessage(opName, `${cmdOPS}: ${err} \x1b[31m (ERROR) \x1b[0m`))
+                        simplify.getFunctionPolicy({
+                            adaptor: provider.getFunction(),
+                            functionConfig: { FunctionName: functionName, Version: functionVersion, ...functionInfo }
+                        }).then(function (roleBasePolicy) {
+                            return Promise.resolve(JSON.parse(roleBasePolicy.Policy))
+                        }).catch(err => {
+                            return Promise.resolve()
+                        }).then(result => {
+                            functionInfo.ResourcePolicy = result
+                            scanOutput[functionInfo.FunctionName] = functionInfo
+                            analyseOrPatch({ functionInfo, logRetention, customKmsArn, secureFunction, secureLog }).then(res => {
+                                funcList.push({ ...res, Layers: functionMeta.LayerInfos, LogGroup: functionMeta.LogGroup })
+                                if (lineIndex >= files.length) {
+                                    callback && callback(funcList)
+                                } else {
+                                    secOpsFunctions(files, callback)
+                                }
+                            }).catch(err => simplify.consoleWithErrors(opName, `${functionName} ${functionInfo.FunctionName}: ${err}`))
+                        })
+                    }).catch(err => simplify.consoleWithErrors(opName, `${functionName}: ${err}`))
+                }).catch(err => simplify.consoleWithErrors(opName, `${functionName}: ${err}`))
             }
         }
     } else {
@@ -355,7 +381,7 @@ const processLambda = function () {
                         if (typeof argv.extended !== 'undefined') {
                             isSimpleView = false
                         }
-                        const snapshotList = getSnapshotFromFile(path.resolve(argv.output, `${argv.baseline || '$LATEST'}.json`))
+                        const snapshotList = getSnapshotFromFile(path.resolve(argv.output, `${argv.baseline || utilities.getDateToday()}.json`))
                         const outputTable = functionList.map((func, idx) => {
                             const snapshot = snapshotList ? snapshotList.find(f => f.FunctionName === func.functionInfo.FunctionName) : { Layers: [] }
                             var areLayersValid = snapshotList ? true : false
@@ -392,11 +418,12 @@ const processLambda = function () {
                         utilities.printTableWithJSON(outputTable)
                     } else if (cmdOPS === 'SNAPSHOT') {
                         takeSnapshotToFile(functionList, path.resolve(argv.output, `${utilities.getDateToday()}.json`))
-                        takeSnapshotToFile(functionList, path.resolve(argv.output, `$LATEST.json`))
                     } else {
 
                     }
                 })
+            } else {
+
             }
         })
     } catch (err) {
@@ -439,7 +466,56 @@ const processReport = function () {
     }
 }
 
-if (fs.existsSync(path.resolve(configInputFile))) {
+if (cmdOPS === 'EXPORT') {
+    var config = simplify.getInputConfig({
+        Region: argv.region || 'eu-west-1',
+        Profile: argv.profile || 'default',
+        Bucket: { Name: 'default' }
+    })
+    provider.setConfig(config).then(function () {
+        simplify.listFunctionsInfo({
+            adaptor: provider.getFunction(),
+            searchFor: argv.searchFor
+        }).then(functions => {
+            let csvOutput = ''
+            csvOutput = 'Region,Account,FunctionName,Version,LogRetention,KMS,SecureFunction,SecureLog\r\n'
+            const promiseResults = functions.map(f => {
+                const parts = f.FunctionArn.split(':')
+                if (!argv.searchInAlias || argv.searchInAlias == '') {
+                    return Promise.resolve(`${parts[3]},${parts[4]},${parts[6]},$LATEST,90,${f.KMSKeyArn || ''},FALSE,FALSE`)
+                }
+                return new Promise((resolve) => {
+                    provider.getFunction().listAliases({
+                        FunctionName: f.FunctionName
+                    }, (err, data) => {
+                        if (!err && data.Aliases) {
+                            const matchedAlias = data.Aliases.find(alias => alias.Name.toLowerCase().startsWith((argv.searchInAlias || "").toLowerCase()))
+                            if (matchedAlias) {
+                                resolve(`${parts[3]},${parts[4]},${parts[6]},${matchedAlias.FunctionVersion},90,${f.KMSKeyArn || ''},FALSE,FALSE`)
+                            } else {
+                                resolve(undefined)
+                            }
+                        } else {
+                            resolve(undefined)
+                        }
+                    })
+                });
+            })
+            Promise.all(promiseResults).then(results => {
+                const filteredResult = results.filter(x => x)
+                csvOutput += filteredResult.join('\r\n')
+                if (fs.existsSync(path.resolve(__dirname, 'functions.csv'))) {
+                    fs.unlinkSync(path.resolve(__dirname, 'functions.csv'))
+                }
+                fs.writeFileSync(path.resolve(__dirname, 'functions.csv'), csvOutput)
+                if (argv.searchInAlias) {
+                    simplify.consoleWithMessage(opName, `Filtering in ${functions.length} result${functions.length > 1 ? 's' : ''} with "${argv.searchInAlias}" alias: ${filteredResult.length} result${filteredResult.length > 1 ? 's' : ''} matches`)
+                }
+                console.log('\r\n - A list of functions have been written to:', path.resolve(__dirname, 'functions.csv'))
+            })
+        }).catch(err => simplify.consoleWithErrors(opName, err))
+    })
+} else if (fs.existsSync(path.resolve(configInputFile))) {
     var fileContent = fs.readFileSync(path.resolve(configInputFile), 'utf-8')
     if (fileFormat == 'CSV') {
         files = fileContent.split(/\r?\n/)
@@ -450,3 +526,4 @@ if (fs.existsSync(path.resolve(configInputFile))) {
         processReport()
     }
 }
+

@@ -7,7 +7,6 @@ const simplify = require('simplify-sdk')
 const provider = require('simplify-sdk/provider')
 const utilities = require('simplify-sdk/utilities')
 const asciichart = require('asciichart');
-const { resolve } = require('path');
 const GREEN = '\x1b[32m'
 const RED = '\x1b[31m'
 const YELLOW = '\x1b[33m'
